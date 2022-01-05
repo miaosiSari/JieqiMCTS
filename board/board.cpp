@@ -62,24 +62,6 @@ const char board::Board::_initial_state[MAX] =
                     "                ";
 //这种情况黑方会车五进二吃兵, 目前框架理论上无法解决(因为吃兵也不是坏棋), 考虑使用双递归解决。
 */
-
-const char board::Board::_initial_state[MAX] = 
-                    "                "
-                    "                "
-                    "                "
-                    "   dN.k.g..d    "
-                    "   ....a....    "
-                    "   ......n.a    "
-                    "   ..R......    "
-                    "   n......r.    "
-                    "   .....R...    "
-                    "   ..C...C..    "
-                    "   ....P....    "
-                    "   ....A....    "
-                    "   D...K...D    "
-                    "                "
-                    "                "
-                    "                ";
 #endif
 
 const std::unordered_map<std::string, std::string> board::Board::uni_pieces = {
@@ -205,14 +187,10 @@ void board::Board::initialize_di(){
     std::unordered_set<int> redplaces = {195, 196, 197, 198, 200, 201, 202, 203, 164, 170, 147, 149, 151, 153, 155};
     std::unordered_set<int> blackplaces = {59, 58, 57, 56, 54, 53, 52, 51, 90, 84, 107, 105, 103, 101, 99};
     for(int pos: redplaces){
-        for(int i = 0; i < VERSION_MAX; ++i){
-           di[i][1][(int)random_map[true][pos]] += (state_red[pos] >= 'D' && state_red[pos] <= 'I') ? 1 : 0;
-        }
+        di[1][(int)random_map[true][pos]] += (state_red[pos] >= 'D' && state_red[pos] <= 'I') ? 1 : 0;
     }
     for(int pos: blackplaces){
-        for(int i = 0; i < VERSION_MAX; ++i){
-           di[i][0][(int)random_map[true][pos]] += (state_red[pos] >= 'd' && state_red[pos] <= 'i') ? 1 : 0;
-        }
+        di[0][(int)random_map[true][pos]] += (state_red[pos] >= 'd' && state_red[pos] <= 'i') ? 1 : 0;
     }
     memmove(this -> di_red, this -> di, sizeof(this -> di));
     memmove(this -> di_black, this -> di, sizeof(this -> di));
@@ -376,15 +354,11 @@ std::shared_ptr<InfoDict> board::Board::Move(const int x1, const int y1, const i
         eat_check = eat_tmp;
         eat_type = eat_type_tmp;
         eat_rb = eat;
-        for(int i = 0; i < VERSION_MAX && eat_type == 2; ++i){
-            di_red[i][0][(int)eat_check] -= 1;
-        }
+        di_red[0][(int)eat_check] -= 1;
         state_red[encode_to] = state_red[encode_from];
         FIND(state_red[encode_to], encode_from, turn);
-        for(int i = 0; i < VERSION_MAX && eat_type_tmp == 2; ++i){//红方暗子翻出, 双方都减1
-            di_red[i][1][(int)state_red[encode_to]] -= 1; 
-            di_black[i][1][(int)state_red[encode_to]] -= 1;
-        }
+        di_red[1][(int)state_red[encode_to]] -= 1; 
+        di_black[1][(int)state_red[encode_to]] -= 1;
         state_red[encode_from] = '.';
         state_black[reverse_encode_to] = state_black[reverse_encode_from];
         FIND(state_black[reverse_encode_to], reverse_encode_from, !turn);
@@ -398,15 +372,11 @@ std::shared_ptr<InfoDict> board::Board::Move(const int x1, const int y1, const i
         eat_type = eat_type_tmp;
         eat_rb = swapcase(eat);
         //黑吃红暗子减di_black
-        for(int i = 0; i < VERSION_MAX && eat_type == 2; ++i){
-            di_black[i][1][(int)swapcase(eat_check)] -= 1;
-        }
+        di_black[1][(int)swapcase(eat_check)] -= 1;
         state_black[encode_to] = state_black[encode_from];
         FIND(state_black[encode_to], encode_from, turn);
-        for(int i = 0; i < VERSION_MAX && eat_type_tmp == 2; ++i){//黑方暗子翻出, 双方都减1
-            di_red[i][0][(int)swapcase(state_black[encode_to])] -= 1; 
-            di_black[i][0][(int)swapcase(state_black[encode_to])] -= 1;
-        }
+        di_red[0][(int)swapcase(state_black[encode_to])] -= 1; 
+        di_black[0][(int)swapcase(state_black[encode_to])] -= 1;
         state_black[encode_from] = '.';
         state_red[reverse_encode_to] = state_red[reverse_encode_from];
         FIND(state_red[reverse_encode_to], reverse_encode_from, !turn);
@@ -428,14 +398,14 @@ void board::Board::DebugDI(){
         if(c == 'K') {
             continue;
         }
-        printf("红方字符=%c, 红方相应个数: %d, 黑方字符=%c, 黑方相应个数=%d\n", c, di_red[0][1][(int)c], swapcase(c), di_red[0][0][(int)swapcase(c)]);
+        printf("红方字符=%c, 红方相应个数: %d, 黑方字符=%c, 黑方相应个数=%d\n", c, di_red[1][(int)c], swapcase(c), di_red[0][(int)swapcase(c)]);
     }
     printf("黑方视角:\n");
     for(char c: MINGZI){
         if(c == 'K') {
             continue;
         }
-        printf("红方字符=%c, 红方相应个数: %d, 黑方字符=%c, 黑方相应个数=%d\n", c, di_black[0][1][(int)c], swapcase(c), di_black[0][0][(int)swapcase(c)]);
+        printf("红方字符=%c, 红方相应个数: %d, 黑方字符=%c, 黑方相应个数=%d\n", c, di_black[1][(int)c], swapcase(c), di_black[0][(int)swapcase(c)]);
     }
 }
 
@@ -565,28 +535,20 @@ void board::Board::Print_ij_ucci(unsigned char i, unsigned char j){
 }
 
 void board::Board::GenerateRandomMap(){
-    auto pop_chess = [](std::vector<char>& v, char c){
-        for(std::vector<char>::iterator it = v.begin(); it != v.end(); ){
-            if(*it == c){
-                v.erase(it++);
-                return;
-            }
-            else{
-                it++;
-            }
-        }
-    };
-
-    std::vector<char> chararray_red = {'R', 'R', 'N', 'N', 'B', 'B', 'A', 'A', 'C', 'C', 'P', 'P', 'P', 'P', 'P'};
-    std::vector<char> chararray_black = {'r', 'r', 'n', 'n', 'b', 'b', 'a', 'a', 'c', 'c', 'p', 'p', 'p', 'p', 'p'};
+    std::multiset<char> chararray_red_set = {'R', 'R', 'N', 'N', 'B', 'B', 'A', 'A', 'C', 'C', 'P', 'P', 'P', 'P', 'P'};
+    std::multiset<char> chararray_black_set = {'r', 'r', 'n', 'n', 'b', 'b', 'a', 'a', 'c', 'c', 'p', 'p', 'p', 'p', 'p'};
     for(int i = 51; i <= 203; ++i){
         if(::isupper(state_red[i]) && state_red[i] != 'K' && MINGZI.find(state_red[i]) != std::string::npos){
-            pop_chess(chararray_red, state_red[i]);
+            chararray_red_set.erase(state_red[i]);
         }
         if(::islower(state_red[i]) && state_red[i] != 'k' && MINGZI.find(swapcase(state_red[i])) != std::string::npos){
-            pop_chess(chararray_black, state_red[i]);
+            chararray_black_set.erase(state_red[i]);
         }
     }
+    std::vector<char> chararray_red, chararray_black;
+    chararray_red.assign(chararray_red_set.begin(), chararray_red_set.end());
+    chararray_black.assign(chararray_black_set.begin(), chararray_black_set.end());
+
 
     std::vector<unsigned char> position_red = {TXY(0, 0), TXY(0, 1), TXY(0, 2), TXY(0, 3), TXY(0, 5), TXY(0, 6), \
         TXY(0, 7), TXY(0, 8), TXY(2, 1), TXY(2, 7), TXY(3, 0), TXY(3, 2), TXY(3, 4), TXY(3, 6), TXY(3, 8)};

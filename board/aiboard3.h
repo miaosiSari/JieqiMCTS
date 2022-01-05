@@ -105,7 +105,7 @@ public:
     std::unordered_map<std::string, bool>* hist;
     std::unordered_map<std::string, std::pair<unsigned char, unsigned char>> kaijuku;
     AIBoard3() noexcept;
-    AIBoard3(const char another_state[MAX], bool turn, int round, const unsigned char di[5][2][123], short score, std::unordered_map<std::string, bool>* hist) noexcept;
+    AIBoard3(const char another_state[MAX], bool turn, int round, const unsigned char di[2][123], short score, std::unordered_map<std::string, bool>* hist) noexcept;
     AIBoard3(const AIBoard3& another_board) = delete;
     virtual ~AIBoard3()=default;
     void Reset() noexcept;
@@ -126,7 +126,7 @@ public:
     bool Executed(bool* oppo_mate, std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[], int num_of_legal_moves_tmp, bool calc);
     bool ExecutedDebugger(bool *oppo_mate);
     bool Ismate_After_Move(unsigned char src, unsigned char dst);
-    void CopyData(const unsigned char di[5][2][123]);
+    void CopyData(const unsigned char di[2][123]);
     std::string Kaiju();
     virtual std::string Think();
     void PrintPos(bool turn) const;

@@ -22,6 +22,7 @@
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <set>
 #include <unordered_set>
 #include <iostream>
 #include <functional>
@@ -58,9 +59,9 @@ extern unsigned char di[VERSION_MAX][2][123];
 namespace board{
 class Board{
 public:
-    unsigned char di[VERSION_MAX][2][123];
-    unsigned char di_red[VERSION_MAX][2][123];
-    unsigned char di_black[VERSION_MAX][2][123];
+    unsigned char di[2][123];
+    unsigned char di_red[2][123];
+    unsigned char di_black[2][123];
     bool finished = false;
     char state_red[MAX];
     char state_black[MAX];

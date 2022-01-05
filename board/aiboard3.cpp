@@ -109,7 +109,7 @@ board::AIBoard3::AIBoard3() noexcept:
 }
 
 
-board::AIBoard3::AIBoard3(const char another_state[MAX], bool turn, int round, const unsigned char di[VERSION_MAX][2][123], short score, std::unordered_map<std::string, bool>* hist) noexcept: 
+board::AIBoard3::AIBoard3(const char another_state[MAX], bool turn, int round, const unsigned char di[2][123], short score, std::unordered_map<std::string, bool>* hist) noexcept: 
                                                                                                                             version(0), 
                                                                                                                             round(round), 
                                                                                                                             turn(turn), 
@@ -741,45 +741,43 @@ bool board::AIBoard3::Ismate_After_Move(unsigned char src, unsigned char dst){
     return mate;
 }
 
-void board::AIBoard3::CopyData(const unsigned char di[VERSION_MAX][2][123]){
+void board::AIBoard3::CopyData(const unsigned char di[2][123]){
     memset(aiaverage, 0, sizeof(aiaverage));
     memset(aisumall, 0, sizeof(aisumall));
     memset(aidi, 0, sizeof(aidi));
     memcpy(aidi, di, sizeof(aidi));
-    const float discount_factor = 1.5;
-
-    for(int ver = 0; ver < VERSION_MAX; ++ver){
-        short numr = 0, numb = 0; 
-        numr += aidi[ver][1][INTR]; numr += aidi[ver][1][INTN];  numr += aidi[ver][1][INTB];  numr += aidi[ver][1][INTA];  numr += aidi[ver][1][INTC]; numr += aidi[ver][1][INTP]; 
-        numb += aidi[ver][0][INTr]; numb += aidi[ver][0][INTn];  numb += aidi[ver][0][INTb];  numb += aidi[ver][0][INTa];  numb += aidi[ver][0][INTc]; numb += aidi[ver][0][INTp]; 
-        aisumall[ver][1] = numr; aisumall[ver][0] = numb;
-        if(numr > 0){
-            double sumr = 0.0;
-            for(const char c : MINGZI){
-                sumr += pst[(int)c][0] * aidi[ver][1][(int)c] / discount_factor;
-            }
-            aiaverage[ver][1][0][0] = ::round(sumr / numr);
-            for(int i = 51; i <= 203; ++i){
-                sumr = 0.0;
-                for(const char c : MINGZI){
-                    sumr += pst[(int)c][i] * aidi[ver][1][(int)c];
-                }
-                aiaverage[ver][1][1][i] = ::round(sumr / numr);
-            }
+    constexpr float discount_factor = 1.5;
+    constexpr int ver = 0;
+    short numr = 0, numb = 0; 
+    numr += aidi[ver][1][INTR]; numr += aidi[ver][1][INTN];  numr += aidi[ver][1][INTB];  numr += aidi[ver][1][INTA];  numr += aidi[ver][1][INTC]; numr += aidi[ver][1][INTP]; 
+    numb += aidi[ver][0][INTr]; numb += aidi[ver][0][INTn];  numb += aidi[ver][0][INTb];  numb += aidi[ver][0][INTa];  numb += aidi[ver][0][INTc]; numb += aidi[ver][0][INTp]; 
+    aisumall[ver][1] = numr; aisumall[ver][0] = numb;
+    if(numr > 0){
+        double sumr = 0.0;
+        for(const char c : MINGZI){
+            sumr += pst[(int)c][0] * aidi[ver][1][(int)c] / discount_factor;
         }
-        if(numb > 0){
-            double sumb = 0.0;
+        aiaverage[ver][1][0][0] = ::round(sumr / numr);
+        for(int i = 51; i <= 203; ++i){
+            sumr = 0.0;
             for(const char c : MINGZI){
-                sumb += pst[(int)c][0] * aidi[ver][0][((int)c)^32] / discount_factor;
+                sumr += pst[(int)c][i] * aidi[ver][1][(int)c];
             }
-            aiaverage[ver][0][0][0] = ::round(sumb / numb);
-            for(int i = 51; i <= 203; ++i){
-                sumb = 0.0;
-                for(const char c : MINGZI){
-                    sumb += pst[(int)c][i] * aidi[ver][0][((int)c)^32];
-                }
-                aiaverage[ver][0][1][i] = ::round(sumb / numb);
+            aiaverage[ver][1][1][i] = ::round(sumr / numr);
+        }
+    }
+    if(numb > 0){
+        double sumb = 0.0;
+        for(const char c : MINGZI){
+            sumb += pst[(int)c][0] * aidi[ver][0][((int)c)^32] / discount_factor;
+        }
+        aiaverage[ver][0][0][0] = ::round(sumb / numb);
+        for(int i = 51; i <= 203; ++i){
+            sumb = 0.0;
+            for(const char c : MINGZI){
+                sumb += pst[(int)c][i] * aidi[ver][0][((int)c)^32];
             }
+            aiaverage[ver][0][1][i] = ::round(sumb / numb);
         }
     }
 }

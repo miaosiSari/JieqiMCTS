@@ -113,7 +113,7 @@ board::AIBoard4::AIBoard4() noexcept:
 }
 
 
-board::AIBoard4::AIBoard4(const char another_state[MAX], bool turn, int round, const unsigned char di[VERSION_MAX][2][123], short score, std::unordered_map<std::string, bool>* hist) noexcept: 
+board::AIBoard4::AIBoard4(const char another_state[MAX], bool turn, int round, const unsigned char di[2][123], short score, std::unordered_map<std::string, bool>* hist) noexcept: 
                                                                                                                             version(0), 
                                                                                                                             round(round), 
                                                                                                                             turn(turn), 
@@ -783,14 +783,13 @@ void board::AIBoard4::CalcVersion(const int ver, const float discount_factor){
     }
 }
 
-void board::AIBoard4::CopyData(const unsigned char di[VERSION_MAX][2][123]){
+void board::AIBoard4::CopyData(const unsigned char di[2][123]){
     memset(aiaverage, 0, sizeof(aiaverage));
     memset(aisumall, 0, sizeof(aisumall));
     memset(aidi, 0, sizeof(aidi));
-    #if DEBUG
-    //debugset(this);
-    #endif
-    memcpy(aidi, di, sizeof(aidi));
+    for(int i = 0; i < VERSION_MAX; ++i){
+        memcpy(aidi[i], di, sizeof(aidi[i]));
+    }
     CalcVersion(0, discount_factor);
 }
 
