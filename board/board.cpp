@@ -148,6 +148,7 @@ board::Board::Board() noexcept: finished(false),
     hist[state_red] = false;
     initialize_di();
     _has_initialized = true;
+    GenerateRandomBoard();
 }
 
 void board::Board::Reset(std::unordered_map<bool, std::unordered_map<unsigned char, char>>* random_map){
@@ -312,17 +313,6 @@ std::shared_ptr<InfoDict> board::Board::Move(const std::string ucci, const bool 
     //the ucci string is in "a0a1“ format.
     //Please check https://www.xqbase.com/protocol/cchess_ucci.htm
     assert(ucci.size() == 4);
-    const int y1 = (int)(ucci[0] - 'a');
-    const int x1 = (int)(ucci[1] - '0');
-    const int y2 = (int)(ucci[2] - 'a');
-    const int x2 = (int)(ucci[3] - '0');
-    return Move(x1, y1, x2, y2, check);
-}
-
-std::shared_ptr<InfoDict> board::Board::Move(const char* ucci, const bool check){
-    //the ucci string is in "a0a1“ format.
-    //Please check https://www.xqbase.com/protocol/cchess_ucci.htm
-    assert(strlen(ucci) == 4);
     const int y1 = (int)(ucci[0] - 'a');
     const int x1 = (int)(ucci[1] - '0');
     const int y2 = (int)(ucci[2] - 'a');
@@ -578,4 +568,19 @@ void board::Board::GenerateRandomMap(){
     }
     random_map[true] = r;
     random_map[false] = b;
+}
+
+void board::Board::GenerateRandomBoard(){
+    std::multiset<char> chararray_red_set = {'R', 'R', 'N', 'N', 'B', 'B', 'A', 'A', 'C', 'C', 'P', 'P', 'P', 'P', 'P'};
+    std::multiset<char> chararray_black_set = {'r', 'r', 'n', 'n', 'b', 'b', 'a', 'a', 'c', 'c', 'p', 'p', 'p', 'p', 'p'};
+    std::unordered_set<unsigned char> all_places;
+    for(unsigned char i = 51; i <= 203; ++i){
+        if((i & 15) < 3 || (i & 15) > 11){
+            continue;
+        }
+        all_places.insert(i);
+    }
+    std::unordered_map<unsigned char, char> LUT = {
+        {51, 'd'}, {52, 'e'}, {53, 'f'}
+    }
 }

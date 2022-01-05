@@ -81,22 +81,21 @@ public:
     const std::unordered_map<std::string, std::string>& GetUniPieces() const;
     void PrintPos(bool turn, bool iscovered, bool god, bool swapcasewhenblack) const;
     std::shared_ptr<InfoDict> Move(const std::string ucci, const bool = false); //ucci representation
-    std::shared_ptr<InfoDict> Move(const char* ucci, const bool = false);
     std::shared_ptr<InfoDict> Move(const int x1, const int y1, const int x2, const int y2, const bool = false);
     void DebugDI();
     void GenMovesWithScore();
     void GenerateRandomMap();
-    void PrintRandomMap(bool turn);
+    void GenerateRandomBoard();
     std::function<int(int)> translate_x = [](const int x) -> int {return 12 - x;};
     std::function<int(int)> translate_y = [](const int y) -> int {return 3 + y;};
     std::function<int(int, int)> translate_x_y = [](const int x, const int y) -> int{return 195 - 16 * x + y;};
     std::function<int(int, int)> encode = [](const int x, const int y) -> int {return 16 * x + y;};  
     std::function<int(int)> reverse = [](const int x) -> int {return 254 - x;};
     std::function<char(char)> swapcase = [](const char c) -> char{
-       if(isalpha(c)) {
+        if(isalpha(c)) {
            return c ^ 32;
-       }
-       return c;
+        }
+        return c;
     };
 
     std::function<void(char*)> rotate = [this](char* p){

@@ -5,12 +5,25 @@
 #define BLACK 0
 #include <map>
 #include <unordered_map>
+#include <set>
 #include <algorithm>
 #include <string>
 #include <regex>
 #include <functional>
 #include <iostream>
 #include <type_traits>
+
+template<typename S>
+S select_random(std::multiset<S> &s, bool erase=false) {
+   srand(time(NULL));
+   size_t n = rand() % s.size();
+   auto it = std::begin(s);
+   std::advance(it,n);
+   if(erase){
+      s.erase(it);
+   }
+   return *it;
+}
 
 namespace board{
    struct Thinker;
