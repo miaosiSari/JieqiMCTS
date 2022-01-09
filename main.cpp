@@ -4,6 +4,7 @@
 #include <time.h>
 #include "global/global.h"
 #include "board/god.h"
+#include "board/board.h"
 #include "score/score.h"
 
 extern bool read_score_table(const char* score_file, short pst[][256]);

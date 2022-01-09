@@ -30,6 +30,7 @@ extern std::unordered_map<int, std::unordered_map<std::pair<uint32_t, int>, std:
 struct God{
     char eat = '.';
     bool ok = false;
+    bool random = 0;
     int type1 = 0;
     int type2 = 0;
     size_t winning_threshold_class = 0;
@@ -47,6 +48,7 @@ struct God{
     God()=delete;
     God(const char* file);
     ~God();
+    void GenRandomBoard();
     bool GetTurn();
     int StartThinker(std::ofstream* of);
     void Play(std::string logfile);

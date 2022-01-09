@@ -49,31 +49,39 @@ God::God(const char* file): ok(true), redwin(0), blackwin(0), draw(0), file(file
     std::string line;
     if(!instream.is_open()){
         ok = false;
-        assert(false);
         return;
     }
+    random = false;
     while(std::getline(instream, line)){
-        if(counter >= 4){
-            ok = false;
-            break;
-        }
         line = trim(line);
 
-        if(counter == 0 && !line.empty()){
+        if(line.size() >= 2 && line[0] == 'R' && line[1] == 'A'){
+            if(random) {
+                ok = false;
+                break;
+            }
+            random = true;
+            continue;
+        }
+
+        else if(counter == 0 && !line.empty()){
             if(!isT<int>(line, &type1)){
                 ok = false;
+                return;
             }
         }
 
         else if(counter == 1 && !line.empty()){
             if(!isT<int>(line, &type2)){
                 ok = false;
+                return;
             }
         }
 
         else if(counter == 2 && !line.empty()){
             if(!isT<size_t>(line, &winning_threshold_class)){
                 ok = false;
+                return;
             }
         }
 
@@ -86,6 +94,11 @@ God::God(const char* file): ok(true), redwin(0), blackwin(0), draw(0), file(file
             }
         }
 
+        if(counter >= 4){
+            ok = false;
+            break;
+        }
+        std::cout << line << " " << counter << "\n";
         ++counter;
     }
     if(counter < 2){
@@ -101,6 +114,12 @@ God::~God(){
    Singleton<board::Board>::deleteT();
    if(thinker1) thinker1.reset();
    if(thinker2) thinker2.reset();
+}
+
+void God::GenRandomBoard(){
+    if(random && board_pointer){
+        board_pointer -> GenRandomBoard();
+    }
 }
 
 int God::StartThinker(std::ofstream* of){
@@ -124,6 +143,7 @@ int God::StartThinker(std::ofstream* of){
         for(int i = 0; i < thinker1 -> retry_num; ++i){
             std::string think_result = thinker1 -> Think(); // This function might cost a lot of time!
             std::string trim_think_result = trim(think_result);
+            std::cout << trim_think_result << "\n";
             if(trim_think_result == "R" || trim_think_result == "r"){
                 return BLACK_WIN;
             }else if(trim_think_result == "W" || trim_think_result == "w"){
@@ -145,6 +165,7 @@ int God::StartThinker(std::ofstream* of){
                 return p -> win ? RED_WIN : NORMAL;
             }
         } 
+        board_pointer -> PrintPos(board_pointer -> turn, true, false, true); 
         printf("红方连续%d个无效棋步, 判输!\n", thinker1 -> retry_num);
         return BLACK_WIN;
     }else{
@@ -205,6 +226,7 @@ int God::StartGame(){
     }
     int result = NORMAL;
     board_pointer -> Reset(NULL);
+    GenRandomBoard();
     if(write){
         of << "# ";
         for(auto it = board_pointer -> random_map[true].begin(); it != board_pointer -> random_map[true].end(); ++it){
@@ -479,7 +501,9 @@ void God::Play(std::string logfile){
 
         if(state == 2){
             board_pointer -> Reset(&random_map);
-            assert(board_pointer -> CheckRandomMap());
+            if(!random){
+                assert(board_pointer -> CheckRandomMap());
+            }
             printf("\n对局No.%zu:\n", gamecounter);
             red_eat_black.clear();
             black_eat_red.clear();

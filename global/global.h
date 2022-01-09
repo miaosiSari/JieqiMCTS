@@ -15,7 +15,6 @@
 
 template<typename S>
 S select_random(std::multiset<S> &s, bool erase=false) {
-   srand(time(NULL));
    size_t n = rand() % s.size();
    auto it = std::begin(s);
    std::advance(it,n);

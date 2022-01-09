@@ -84,8 +84,9 @@ public:
     std::shared_ptr<InfoDict> Move(const int x1, const int y1, const int x2, const int y2, const bool = false);
     void DebugDI();
     void GenMovesWithScore();
-    void GenerateRandomMap();
-    void GenerateRandomBoard();
+    void GenRandomMap();
+    void PrintRandomMap();
+    void GenRandomBoard();
     std::function<int(int)> translate_x = [](const int x) -> int {return 12 - x;};
     std::function<int(int)> translate_y = [](const int y) -> int {return 3 + y;};
     std::function<int(int, int)> translate_x_y = [](const int x, const int y) -> int{return 195 - 16 * x + y;};
@@ -111,6 +112,19 @@ public:
 
     std::function<bool()> CheckRandomMap = [this]() -> bool {
         return random_map[true].size() == 30 && random_map[false].size() == 30;
+    };
+
+    std::function<std::string(unsigned char)> translate_single = [](unsigned char i) -> std::string{
+       int x1 = 12 - (i >> 4);
+       int y1 = (i & 15) - 3;
+       std::string ret = "  ";
+       ret[0] = 'a' + y1;
+       ret[1] = '0' + x1;
+       return ret;
+    };
+
+    std::function<std::string(unsigned char, unsigned char)> translate_ucci = [this](unsigned char src, unsigned char dst) -> std::string{
+       return translate_single(src) + translate_single(dst);
     };
 
     std::tuple<unsigned short, unsigned char, unsigned char> legal_moves[MAX_POSSIBLE_MOVES];

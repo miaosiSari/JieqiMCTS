@@ -814,7 +814,8 @@ std::string board::AIBoard3::Kaiju(){
 
 std::string board::AIBoard3::Think(){
     SetScoreFunction("mtd_thinker3", 2);
-    return round == 0 ? Kaiju() : _thinker_func(this);
+    //return round == 0 ? Kaiju() : _thinker_func(this);
+    return _thinker_func(this);
 }
 
 

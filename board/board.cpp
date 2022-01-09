@@ -144,11 +144,10 @@ board::Board::Board() noexcept: finished(false),
     memset(_is_legal_move, false, sizeof(_is_legal_move));
     memset(legal_moves, 0, sizeof(legal_moves));
     _initialize_dir();
-    GenerateRandomMap();
+    GenRandomMap();
     hist[state_red] = false;
     initialize_di();
     _has_initialized = true;
-    GenerateRandomBoard();
 }
 
 void board::Board::Reset(std::unordered_map<bool, std::unordered_map<unsigned char, char>>* random_map){
@@ -174,7 +173,7 @@ void board::Board::Reset(std::unordered_map<bool, std::unordered_map<unsigned ch
     if(random_map){
         this -> random_map = std::move(*random_map);
     }else{
-        GenerateRandomMap();
+        GenRandomMap();
     }
     hist[state_red] = false;
     initialize_di();
@@ -524,7 +523,7 @@ void board::Board::Print_ij_ucci(unsigned char i, unsigned char j){
     printf(" (ucci = %s).\n", ucci);
 }
 
-void board::Board::GenerateRandomMap(){
+void board::Board::GenRandomMap(){
     std::multiset<char> chararray_red_set = {'R', 'R', 'N', 'N', 'B', 'B', 'A', 'A', 'C', 'C', 'P', 'P', 'P', 'P', 'P'};
     std::multiset<char> chararray_black_set = {'r', 'r', 'n', 'n', 'b', 'b', 'a', 'a', 'c', 'c', 'p', 'p', 'p', 'p', 'p'};
     for(int i = 51; i <= 203; ++i){
@@ -570,17 +569,68 @@ void board::Board::GenerateRandomMap(){
     random_map[false] = b;
 }
 
-void board::Board::GenerateRandomBoard(){
+void board::Board::PrintRandomMap(){
+    for(std::unordered_map<unsigned char, char>::iterator it = random_map[true].begin(); it != random_map[true].end(); ++it){
+        std::cout << (translate_single(it -> first) + ": " + it -> second) << "\n";
+    }
+}
+
+void board::Board::GenRandomBoard(){
+    srand(time(NULL));
+    memset(state_red, ' ', sizeof(state_red));
+    memset(state_black, ' ', sizeof(state_black));
+    random_map.clear();
     std::multiset<char> chararray_red_set = {'R', 'R', 'N', 'N', 'B', 'B', 'A', 'A', 'C', 'C', 'P', 'P', 'P', 'P', 'P'};
     std::multiset<char> chararray_black_set = {'r', 'r', 'n', 'n', 'b', 'b', 'a', 'a', 'c', 'c', 'p', 'p', 'p', 'p', 'p'};
-    std::unordered_set<unsigned char> all_places;
+    std::multiset<unsigned char> all_places;
     for(unsigned char i = 51; i <= 203; ++i){
         if((i & 15) < 3 || (i & 15) > 11){
             continue;
         }
         all_places.insert(i);
+        state_red[i] = '.';
     }
     std::unordered_map<unsigned char, char> LUT = {
-        {51, 'd'}, {52, 'e'}, {53, 'f'}
+        {51, 'd'}, {52, 'e'}, {53, 'f'}, {54, 'g'}, {56, 'g'}, {57, 'f'}, {58, 'e'}, {59, 'd'}, {84, 'h'}, {90, 'h'}, {99, 'i'}, {101, 'i'}, {103, 'i'}, {105, 'i'}, {107, 'i'},
+        {147, 'I'}, {149, 'I'}, {151, 'I'}, {153, 'I'}, {155, 'I'}, {164, 'H'}, {170, 'H'}, {195, 'D'}, {196, 'E'}, {197, 'F'}, {198, 'G'}, {200, 'G'}, {201, 'F'}, {202, 'E'}, {203, 'D'}
+    };
+    for(std::unordered_map<unsigned char, char>::iterator it = LUT.begin(); it != LUT.end(); ++it){
+        unsigned char pos = it -> first;
+        char c = it -> second;
+        char random_char = ' ';
+        if(rand() % 2){
+            if(::isupper(c)){
+                random_char = select_random(chararray_red_set, true); 
+            }else if(::islower(c)){
+                random_char = select_random(chararray_black_set, true);
+            }
+        }
+        if(random_char != ' '){
+            state_red[pos] = c;
+            random_map[true][pos] = random_char;
+            all_places.erase(pos);
+        }
     }
-}
+    std::multiset<unsigned char> shuaiplaces = {198, 199, 200, 182, 183, 184, 166, 167, 168}, jiangplaces = {54, 55, 56, 70, 71, 72, 86, 87, 88};
+    unsigned char shuai = select_random(shuaiplaces, false);
+    unsigned char jiang = select_random(jiangplaces, false);
+    state_red[shuai] = 'K'; state_red[jiang] = 'k';
+    all_places.erase(shuai); all_places.erase(jiang);
+    for(char red: chararray_red_set){
+        if(rand() % 2){
+            unsigned char pos = select_random(all_places, true);
+            state_red[(int)pos] = red;   
+        }
+    }
+    for(char black: chararray_black_set){
+        if(rand() % 2){
+            unsigned char pos = select_random(all_places, true);
+            state_red[(int)pos] = black;
+        }
+    }
+    memmove(state_black, state_red, sizeof(state_red));
+    rotate(state_black);
+    for(std::unordered_map<unsigned char, char>::iterator it = random_map[true].begin(); it != random_map[true].end(); it++){
+        random_map[false][254 - (it -> first)] = swapcase(random_map[true][it -> first]);
+    }
+} 
