@@ -124,7 +124,7 @@ void God::GenRandomBoard(){
 
 int God::StartThinker(std::ofstream* of){
     if(!ok) return -1;
-    board_pointer -> GenMovesWithScore();
+    board_pointer -> GenMoves();
     if(board_pointer -> turn){
         if(type1 == 0){
             printf("红方行棋!\n");
@@ -446,100 +446,4 @@ std::string God::PrintEat(bool turn, bool SHOWDARK){
         }
    }
    return ret;
-}
-
-void God::Play(std::string logfile){
-    printf("\n对局回顾!\n");
-    std::ifstream in(logfile);
-    if(!in.is_open()){
-        std::cout << logfile << " is NOT open!\n";
-        return;
-    }
-    std::string line;
-    int state = 0;
-    size_t gamecounter = 0;
-    bool blocked = false;
-    std::unordered_map<bool, std::unordered_map<unsigned char, char>> random_map;
-    while(std::getline(in, line)){
-        line = trim(line);
-        if(line.find("CLAIM") != std::string::npos){
-            continue;
-        }
-        if(line.empty()) {
-            break;
-        }
-        if(line[0] == '#'){
-            blocked = false;
-            std::string s;
-            int i = 0;
-            int pos = 0;
-            char c = ' ';
-            std::istringstream ss(line);
-            while(std::getline(ss, s, ' ')){
-                if(i >= 1){
-                    if(i & 1){
-                        if(!isT<int>(s, &pos)){
-                            assert(false);
-                            break;
-                        }
-                    }
-                    else{
-                        assert(!s.empty());
-                        c = s[0];
-                        assert(c == 'R' || c == 'N' || c == 'B' || c == 'A' || c == 'C' || c == 'P' || c == 'r' || c == 'n' || c == 'b' || c == 'a' || c == 'c' || c == 'p');
-                        if(state == 0){
-                            random_map[true][(unsigned char)pos] = c;   
-                        }else if(state == 1){
-                            random_map[false][(unsigned char)pos] = c;
-                        }
-                    }
-                }
-                i++;
-            }
-            state++;
-        }
-
-        if(state == 2){
-            board_pointer -> Reset(&random_map);
-            if(!random){
-                assert(board_pointer -> CheckRandomMap());
-            }
-            printf("\n对局No.%zu:\n", gamecounter);
-            red_eat_black.clear();
-            black_eat_red.clear();
-            board_pointer -> PrintPos(true, true, false, true);
-            state = 0;
-            ++gamecounter;
-        }
-
-        if(line.size() == 4 && !blocked){
-            board_pointer -> GenMovesWithScore();
-            std::string turn = board_pointer -> turn ? "红方: " : "黑方: ";
-            std::cout << turn << line << "\n";
-            getchar();
-            std::shared_ptr<InfoDict> p = board_pointer -> Move(line, true);
-            assert(p && p -> islegal);
-            if(p -> win){
-                blocked = true;
-                if(board_pointer -> turn){
-                    printf("黑胜!\n");
-                }else{
-                    printf("红胜!\n");
-                }
-            }
-            if(!board_pointer -> turn){
-                red_eat_black.push_back({p -> eat, p -> eat_type, 195 - 16 * p -> dst_x + p -> dst_y, p -> eat_check});
-            }
-            else{
-                black_eat_red.push_back({p -> eat, p -> eat_type, 195 - 16 * p -> dst_x + p -> dst_y, p -> eat_check});
-            }
-            std::cout << PrintEat(true, true) << "\n";
-            board_pointer -> PrintPos(true, true, false, true);
-        }
-
-    }
-}
-
-void God::Play(){
-    Play(logfile);
 }

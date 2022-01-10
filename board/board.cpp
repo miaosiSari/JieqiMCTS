@@ -150,6 +150,17 @@ board::Board::Board() noexcept: finished(false),
     _has_initialized = true;
 }
 
+board::Board::~Board(){
+    _has_initialized = false;
+    for(size_t i = 0; i < historymoves.size(); ++i){
+        history* p = historymoves[i];
+        if(p){
+            delete p;
+            p = NULL;
+        }
+    }
+}
+
 void board::Board::Reset(std::unordered_map<bool, std::unordered_map<unsigned char, char>>* random_map){
     hist.clear();
     finished = false;
@@ -308,6 +319,10 @@ void board::Board::PrintPos(bool turn, bool iscovered=true, bool god=false, bool
     std::cout << "  ａｂｃｄｅｆｇｈｉ\n\n";
 }
 
+void board::Board::PrintPos() const{
+    PrintPos(turn, true, false, true);
+}
+
 std::shared_ptr<InfoDict> board::Board::Move(const std::string ucci, const bool check){
     //the ucci string is in "a0a1“ format.
     //Please check https://www.xqbase.com/protocol/cchess_ucci.htm
@@ -323,6 +338,7 @@ std::shared_ptr<InfoDict> board::Board::Move(const int x1, const int y1, const i
     if(finished){
         return nullptr;
     }
+    historymoves.push_back(new history(state_red, state_black, di_red, di_black));
     int encode_from = translate_x_y(x1, y1);
     int encode_to = translate_x_y(x2, y2);
     int reverse_encode_from = reverse(encode_from);
@@ -346,8 +362,10 @@ std::shared_ptr<InfoDict> board::Board::Move(const int x1, const int y1, const i
         di_red[0][(int)eat_check] -= 1;
         state_red[encode_to] = state_red[encode_from];
         FIND(state_red[encode_to], encode_from, turn);
-        di_red[1][(int)state_red[encode_to]] -= 1; 
-        di_black[1][(int)state_red[encode_to]] -= 1;
+        if(eat_type_tmp == 2){
+            di_red[1][(int)state_red[encode_to]] -= 1; 
+            di_black[1][(int)state_red[encode_to]] -= 1;
+        }
         state_red[encode_from] = '.';
         state_black[reverse_encode_to] = state_black[reverse_encode_from];
         FIND(state_black[reverse_encode_to], reverse_encode_from, !turn);
@@ -364,8 +382,10 @@ std::shared_ptr<InfoDict> board::Board::Move(const int x1, const int y1, const i
         di_black[1][(int)swapcase(eat_check)] -= 1;
         state_black[encode_to] = state_black[encode_from];
         FIND(state_black[encode_to], encode_from, turn);
-        di_red[0][(int)swapcase(state_black[encode_to])] -= 1; 
-        di_black[0][(int)swapcase(state_black[encode_to])] -= 1;
+        if(eat_type_tmp == 2){
+            di_red[0][(int)swapcase(state_black[encode_to])] -= 1; 
+            di_black[0][(int)swapcase(state_black[encode_to])] -= 1;
+        }
         state_black[encode_from] = '.';
         state_red[reverse_encode_to] = state_red[reverse_encode_from];
         FIND(state_red[reverse_encode_to], reverse_encode_from, !turn);
@@ -379,6 +399,17 @@ std::shared_ptr<InfoDict> board::Board::Move(const int x1, const int y1, const i
        ++round;
     }
     return p;
+}
+
+void board::Board::UndoMove(){
+    if(!historymoves.empty()){
+        history* p = historymoves.back();
+        if(p){
+            p -> recover(state_red, state_black, di_red, di_black);
+            delete p;
+        }
+        historymoves.pop_back();
+    }
 }
 
 void board::Board::DebugDI(){
@@ -398,7 +429,7 @@ void board::Board::DebugDI(){
     }
 }
 
-void board::Board::GenMovesWithScore(){
+void board::Board::GenMoves(){
     memset(_is_legal_move, false, sizeof(_is_legal_move));
     const char *_state_pointer = turn?state_red:state_black;
     for(unsigned char i = 51; i <= 203; ++i){
@@ -494,6 +525,24 @@ void board::Board::GenMovesWithScore(){
         } //dir
     } //for
 }//GenMovesWithScore()
+
+std::string board::Board::GenRandomMove(){
+    std::vector<std::pair<unsigned char, unsigned char>> legal_moves;
+    for(unsigned char i = 51; i <= 203; ++i){
+        for(unsigned char j = 51; j <= 203; ++j){
+            if(_is_legal_move[(int)i][(int)j]){
+                legal_moves.push_back({i, j});
+            }
+        }
+    }
+    srand(time(NULL));
+    if(legal_moves.empty()) {
+        return "";
+    }
+    size_t i = rand() % legal_moves.size();
+    unsigned char first = legal_moves[i].first, second = legal_moves[i].second; 
+    return translate_ucci(first, second);
+}
 
 
 void board::Board::Translate(unsigned char i, unsigned char j, char ucci[5]){
@@ -633,4 +682,5 @@ void board::Board::GenRandomBoard(){
     for(std::unordered_map<unsigned char, char>::iterator it = random_map[true].begin(); it != random_map[true].end(); it++){
         random_map[false][254 - (it -> first)] = swapcase(random_map[true][it -> first]);
     }
+    initialize_di();
 } 

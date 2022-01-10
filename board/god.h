@@ -51,8 +51,6 @@ struct God{
     void GenRandomBoard();
     bool GetTurn();
     int StartThinker(std::ofstream* of);
-    void Play(std::string logfile);
-    void Play();
     int StartGame();
     int StartGameLoop(size_t winning_threshold);
     int StartGameLoop();

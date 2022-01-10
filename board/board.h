@@ -54,11 +54,35 @@ if(c == '.'){ \
     eat_type_tmp = 1; \
 }
 
-extern unsigned char di[VERSION_MAX][2][123];
 
 namespace board{
 class Board{
 public:
+
+    struct history{
+        char state_red[MAX];
+        char state_black[MAX];
+        unsigned char _R1, _N1, _B1, _A1, _C1, _P1, _r1, _n1, _b1, _a1, _c1, _p1;
+        unsigned char _R0, _N0, _B0, _A0, _C0, _P0, _r0, _n0, _b0, _a0, _c0, _p0;
+        history(const char state_red[MAX], const char state_black[MAX], const unsigned char di_red[2][123], const unsigned char di_black[2][123]){
+            memmove(this -> state_red, state_red, sizeof(this -> state_red));
+            memmove(this -> state_black, state_black, sizeof(this -> state_black));
+            _R1 = di_red[1][(int)'R']; _N1 = di_red[1][(int)'N']; _B1 = di_red[1][(int)'B']; _A1 = di_red[1][(int)'A']; _C1 = di_red[1][(int)'C']; _P1 = di_red[1][(int)'P'];
+            _r1 = di_red[0][(int)'r']; _n1 = di_red[0][(int)'n']; _b1 = di_red[0][(int)'b']; _a1 = di_red[0][(int)'a']; _c1 = di_red[0][(int)'c']; _p1 = di_red[0][(int)'p'];
+            _R0 = di_black[1][(int)'R']; _N0 = di_black[1][(int)'N']; _B0 = di_black[1][(int)'B']; _A0 = di_black[1][(int)'A']; _C0 = di_black[1][(int)'C']; _P0 = di_black[1][(int)'P'];
+            _r0 = di_black[0][(int)'r']; _n0 = di_black[0][(int)'n']; _b0 = di_black[0][(int)'b']; _a0 = di_black[0][(int)'a']; _c0 = di_black[0][(int)'c']; _p0 = di_black[0][(int)'p'];
+        }
+        void recover(char state_red[MAX], char state_black[MAX], unsigned char di_red[2][123],unsigned char di_black[2][123]){
+            memmove(state_red, this -> state_red, sizeof(this -> state_red));
+            memmove(state_black, this -> state_black, sizeof(this -> state_black));
+            di_red[1][(int)'R'] = _R1; di_red[1][(int)'N'] = _N1; di_red[1][(int)'B'] = _B1; di_red[1][(int)'A'] = _A1; di_red[1][(int)'C'] = _C1; di_red[1][(int)'P'] = _P1;
+            di_red[0][(int)'r'] = _r1; di_red[0][(int)'n'] = _n1; di_red[0][(int)'b'] = _b1; di_red[0][(int)'a'] = _a1; di_red[0][(int)'c'] = _c1; di_red[0][(int)'p'] = _p1;
+            di_black[1][(int)'R'] = _R0; di_black[1][(int)'N'] = _N0; di_black[1][(int)'B'] = _B0; di_black[1][(int)'A'] = _A0; di_black[1][(int)'C'] = _C0; di_black[1][(int)'P'] = _P0;
+            di_black[0][(int)'r'] = _r0; di_black[0][(int)'n'] = _n0; di_black[0][(int)'b'] = _b0; di_black[0][(int)'a'] = _a0; di_black[0][(int)'c'] = _c0; di_black[0][(int)'p'] = _p0;
+        }
+    };
+    std::vector<history*> historymoves;
+
     unsigned char di[2][123];
     unsigned char di_red[2][123];
     unsigned char di_black[2][123];
@@ -70,6 +94,7 @@ public:
     std::unordered_map<std::string, bool> hist;
     static const std::unordered_map<std::string, std::string> uni_pieces;
     Board() noexcept;
+    ~Board();
     void Reset(std::unordered_map<bool, std::unordered_map<unsigned char, char>>* random_map);
     void initialize_di();
     const std::vector<std::string>& GetHistory() const;
@@ -80,10 +105,13 @@ public:
     std::tuple<int, bool, std::string, std::string> GetTuple() const;
     const std::unordered_map<std::string, std::string>& GetUniPieces() const;
     void PrintPos(bool turn, bool iscovered, bool god, bool swapcasewhenblack) const;
+    void PrintPos() const;
     std::shared_ptr<InfoDict> Move(const std::string ucci, const bool = false); //ucci representation
     std::shared_ptr<InfoDict> Move(const int x1, const int y1, const int x2, const int y2, const bool = false);
+    void UndoMove();
     void DebugDI();
-    void GenMovesWithScore();
+    void GenMoves();
+    std::string GenRandomMove();
     void GenRandomMap();
     void PrintRandomMap();
     void GenRandomBoard();

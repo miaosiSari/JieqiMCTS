@@ -20,10 +20,21 @@ int main(void) {
     assert(read_score_table("../score.conf", pstglobal[2]));
     assert(read_score_table("../score.conf", pstglobal[3]));
     assert(read_score_table("../score.conf", pstglobal[4]));
-    God g("../players.conf");
-    DEBUG ? g.StartGame() : g.StartGameLoopAlternatively();
-    #if !DEBUG
-    g.Play();
-    #endif
+    //God g("../players.conf");
+    //DEBUG ? g.StartGame() : g.StartGameLoopAlternatively();
+    board::Board b;
+    b.GenRandomBoard();
+    b.turn = false;
+    b.GenMoves();
+    b.PrintPos();
+    b.DebugDI();
+    b.PrintRandomMap();
+    std::cout << b.GenRandomMove() << "\n";
+    b.Move(b.GenRandomMove());
+    b.PrintPos();
+    b.DebugDI();
+    b.UndoMove();
+    b.PrintPos();
+    b.DebugDI();
     return 0;
 }
