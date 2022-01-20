@@ -6,14 +6,15 @@
 #include <string.h>
 #include <unordered_set>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <functional>
-#include <stdio.h>
+#include <sstream>
 #include "board.h"
 #include "thinker.h"
 #include "human.h"
 #include "../global/global.h"
-#include "../score/score.h"
-
+#include "aiboard4.h"
 
 #define INVALID -1
 #define NORMAL 0
@@ -22,10 +23,8 @@
 #define WASTE 3
 #define DRAW 4
 #define MAX_ROUNDS 200
-#define NEWRED(X) board::get_withprefix("AIBoard", X, board_pointer -> state_red, board_pointer -> turn, board_pointer -> round, board_pointer -> di_red, 0, &board_pointer -> hist)
-#define NEWBLACK(X) board::get_withprefix("AIBoard", X, board_pointer -> state_black, board_pointer -> turn, board_pointer -> round, board_pointer -> di_black, 0, &board_pointer -> hist)
-extern std::unordered_map<int, std::unordered_map<std::pair<uint32_t, bool>, std::pair<unsigned char, unsigned char>, myhash<uint32_t, bool>>> tp_move_bean;
-extern std::unordered_map<int, std::unordered_map<std::pair<uint32_t, int>, std::pair<short, short>, myhash<uint32_t, int>>> tp_score_bean;
+#define NEWRED(X) new board::AIBoard4(board_pointer -> state_red, board_pointer -> turn, board_pointer -> round, board_pointer -> di_red, 0, &board_pointer -> hist, &tp_move_bean, &tp_score_bean)
+#define NEWBLACK(X) new board::AIBoard4(board_pointer -> state_black, board_pointer -> turn, board_pointer -> round, board_pointer -> di_black, 0, &board_pointer -> hist, &tp_move_bean, &tp_score_bean)
 
 struct God{
     char eat = '.';
@@ -84,6 +83,9 @@ struct God{
         }
         return ret;
     };
+
+    std::unordered_map<std::pair<uint32_t, bool>, std::pair<unsigned char, unsigned char>, myhash<uint32_t, bool>> tp_move_bean;
+    std::unordered_map<std::pair<uint32_t, int>, std::pair<short, short>, myhash<uint32_t, int>> tp_score_bean;
 };
 
 #endif

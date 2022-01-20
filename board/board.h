@@ -35,8 +35,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "../global/global.h"
-#include "../score/score.h"
-
+extern const std::string MINGZI;
 
 #define TXY(x, y) (unsigned char)translate_x_y(x, y)
 #ifdef WIN32

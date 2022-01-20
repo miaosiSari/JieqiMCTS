@@ -2,7 +2,6 @@
 #define human_h
 
 #include "../global/global.h"
-#include "../score/score.h"
 #include "thinker.h"
 #include <iostream>
 

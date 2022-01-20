@@ -3,6 +3,7 @@
 
 #define DEBUG 0
 #define BLACK 0
+#define VERSION_MAX 2
 #include <map>
 #include <unordered_map>
 #include <set>
@@ -12,6 +13,22 @@
 #include <functional>
 #include <iostream>
 #include <type_traits>
+
+#define INTR (int)'R'
+#define INTN (int)'N'
+#define INTB (int)'B'
+#define INTA (int)'A'
+#define INTC (int)'C'
+#define INTP (int)'P'
+#define INTr (int)'r'
+#define INTn (int)'n'
+#define INTb (int)'b'
+#define INTa (int)'a'
+#define INTc (int)'c'
+#define INTp (int)'p'
+void IntializeL1();
+
+struct God;
 
 template<typename S>
 S select_random(std::multiset<S> &s, bool erase=false) {

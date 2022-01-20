@@ -1,27 +1,5 @@
 #include "god.h"
 
-namespace board{
-    extern std::map<std::string, std::function<Thinker*(const char[], bool, int, const unsigned char [2][123], short, std::unordered_map<std::string, bool>*)>> bean;  //define in ../global/global.cpp
-
-    template<typename... Args>
-    Thinker* get(std::string x, Args... args){
-        if(bean.find(x) != bean.end()){
-            return bean[x](args...);
-        }
-        return NULL;
-    }
-
-    template<typename... Args>
-    Thinker* get_withprefix(std::string prefix, std::string x, Args... args){
-        return get(prefix + x, args...);
-    }
-
-    template<typename T, typename... Args>
-    typename std::enable_if<std::is_integral<T>::value || std::is_floating_point<T>::value, Thinker*>::type get_withprefix(std::string prefix, T x, Args... args){
-        return get(prefix + std::to_string(x), args...);
-    }
-}
-
 template<typename T>
 bool isT(std::string s, T* i){
     //用于判断字符串是否为整数/浮点型
@@ -143,7 +121,6 @@ int God::StartThinker(std::ofstream* of){
         for(int i = 0; i < thinker1 -> retry_num; ++i){
             std::string think_result = thinker1 -> Think(); // This function might cost a lot of time!
             std::string trim_think_result = trim(think_result);
-            std::cout << trim_think_result << "\n";
             if(trim_think_result == "R" || trim_think_result == "r"){
                 return BLACK_WIN;
             }else if(trim_think_result == "W" || trim_think_result == "w"){

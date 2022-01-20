@@ -42,7 +42,6 @@ extern unsigned char L1[256][256];
 #include <stdlib.h>
 #include <functional>
 #include "../global/global.h"
-#include "../score/score.h"
 #include "thinker.h"
 #define ROOTED 0
 #define CLEAR_EVERY_DEPTH false
@@ -50,6 +49,9 @@ extern unsigned char L1[256][256];
 
 extern std::unordered_map<int, std::unordered_map<std::pair<uint32_t, bool>, std::pair<unsigned char, unsigned char>, myhash<uint32_t, bool>>> tp_move_bean;
 extern std::unordered_map<int, std::unordered_map<std::pair<uint32_t, int>, std::pair<short, short>, myhash<uint32_t, int>>> tp_score_bean;
+extern char** _dir;
+extern const std::string MINGZI;
+
 namespace board{
     class AIBoard4;
 }
@@ -59,10 +61,9 @@ typedef void(*KONGTOUPAO_SCORE4)(board::AIBoard4* bp, short* kongtoupao_score, s
 typedef std::string(*THINKER4)(board::AIBoard4* bp);
 void register_score_functions4();
 std::string SearchScoreFunction4(void* score_func, int type);
-extern short pstglobal[5][123][256];
+extern short pst[91][204];
 template <typename K, typename V>
 extern V GetWithDefUnordered(const std::unordered_map<K,V>& m, const K& key, const V& defval);
-extern void copy_pst(short dst[][256], short src[][256]);
 
 
 namespace board{
@@ -97,7 +98,6 @@ public:
     char state_black[MAX];
     std::stack<std::tuple<unsigned char, unsigned char, char>> cache;
     short score;//局面分数
-    short pst[123][256];
     std::stack<short> score_cache;
     std::unordered_set<uint32_t> zobrist_cache;
     std::set<unsigned char> rooted_chesses;
@@ -106,9 +106,10 @@ public:
     //tp_score: (zobrist_key, turn, depth <depth * 2 + turn>) --> (lower, upper)
     std::unordered_map<std::pair<uint32_t, int>, std::pair<short, short>, myhash<uint32_t, int>>* tp_score;
     std::unordered_map<std::string, bool>* hist;
-    std::unordered_map<std::string, std::pair<unsigned char, unsigned char>> kaijuku;
-    AIBoard4() noexcept;
-    AIBoard4(const char another_state[MAX], bool turn, int round, const unsigned char di[2][123], short score, std::unordered_map<std::string, bool>* hist) noexcept;
+    AIBoard4()=delete;
+    AIBoard4(const char another_state[MAX], bool turn, int round, const unsigned char di[2][123], short score, std::unordered_map<std::string, bool>* hist,
+        std::unordered_map<std::pair<uint32_t, bool>, std::pair<unsigned char, unsigned char>, myhash<uint32_t, bool>>* tp_move_bean,
+        std::unordered_map<std::pair<uint32_t, int>, std::pair<short, short>, myhash<uint32_t, int>>* tp_score_bean) noexcept;
     AIBoard4(const AIBoard4& another_board) = delete;
     virtual ~AIBoard4()=default;
     void Reset() noexcept;
@@ -131,66 +132,12 @@ public:
     bool Ismate_After_Move(unsigned char src, unsigned char dst);
     void CalcVersion(const int ver, const float discount_factor);
     void CopyData(const unsigned char di[2][123]);
-    std::string Kaiju();
     virtual std::string Think();
     void PrintPos(bool turn) const;
     std::string DebugPrintPos(bool turn) const;
     void print_raw_board(const char* board, const char* hint);
     template<typename... Args> void print_raw_board(const char* board, const char* hint, Args... args);
     uint32_t zobrist[123][256];
-    #if DEBUG
-    std::vector<std::string> debug_flags;
-    int movecounter=0;
-
-    std::function<uint32_t()> get_theoretical_zobrist = [this]() -> uint32_t {
-        uint32_t theoretical_hash = 0;
-        for(int j = 51; j <= 203; ++j){
-            if(::isalpha(state_red[j])){
-                 theoretical_hash ^= zobrist[(int)state_red[j]][j];
-            }
-        }
-        return theoretical_hash;
-    };
-    std::function<std::string(std::pair<unsigned char, unsigned char>)> render = [this](std::pair<unsigned char, unsigned char> t) -> std::string {
-        return translate_ucci(t.first, t.second);
-    };
-    bool C(std::vector<std::string> prefix){
-        if(debug_flags.size() < prefix.size()){
-            return false;
-        }
-        for(size_t i = 0; i < prefix.size(); ++i){
-            if(prefix[i] != debug_flags[i]){
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool _C(std::vector<std::string>& prefix){
-        return C(prefix);
-    }
-
-    template <typename... Args>
-    bool _C(std::vector<std::string>& prefix, std::string now, Args... args){
-        prefix.push_back(now);
-        return _C(prefix, args...);
-    }
- 
-    template <typename... Args>
-    bool C(Args... args){
-        if(sizeof...(args) == 0) {
-            return true;
-        }
-        std::vector<std::string> prefix;
-        return _C(prefix, args...);
-    }
-
-    bool IAMDebugger(std::string s){
-        assert(s.size() == 4);
-        return Ismate_After_Move(f(s.substr(0, 2)), f(s.substr(2, 2)));
-    }
-
-    #endif
     std::function<int(int)> translate_x = [](const int x) -> int {return 12 - x;};
     std::function<int(int)> translate_y = [](const int y) -> int {return 3 + y;};
     std::function<int(int, int)> translate_x_y = [](const int x, const int y) -> int{return 195 - 16 * x + y;};
@@ -246,18 +193,9 @@ public:
 
     std::function<uint32_t(void)> randU32 = []() -> uint32_t{
 	   //BUG: 在Windows上每次生成同样的随机数
-	   #ifdef WIN32
-	   //Windows RAND_MAX 0x7fff
-	   int a = rand();
-	   unsigned b = ((a & 1) << 15) | a; //符号位随机
-	   int c = rand();
-	   unsigned d = ((c & 1) << 15) | c; //符号位随机
-	   return (b << 16) | d;
-	   #else
        std::mt19937 gen(std::random_device{}());
        uint32_t randomNumber = gen();
        return randomNumber;
-	   #endif
     };
 
     template<typename T>
@@ -269,13 +207,11 @@ public:
     }
    
 private:
-    const char* _kaijuku_file;
     std::string _myname;
     bool _has_initialized = false;
     static const int _chess_board_size;
     static const char _initial_state[MAX];
     static const std::unordered_map<std::string, std::string> _uni_pieces;
-    static char _dir[91][8];
     SCORE4 _score_func = NULL;
     KONGTOUPAO_SCORE4 _kongtoupao_score_func = NULL;
     THINKER4 _thinker_func = NULL;
@@ -305,7 +241,6 @@ private:
             }
         }
     };
-    void _initialize_dir();
 };
 }
 
@@ -322,7 +257,4 @@ void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsig
 short eval4(board::AIBoard4* self, const int ver, const short gamma, std::vector<int>& depths, std::vector<bool>& traverse_all_strategies, const bool nullmove, const bool nullmove_now, const bool pruning, \
     const float discount_factor);
 short calleval4(board::AIBoard4* self, const short gamma, std::vector<int> depths, std::vector<bool> traverse_all_strategies, const bool nullmove, const bool pruning);
-#if DEBUG
-void debugset(board::AIBoard4* self);
-#endif
 #endif

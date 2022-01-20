@@ -2,7 +2,6 @@
 #define thinker_h
 
 #include "../global/global.h"
-#include "../score/score.h"
 
 namespace board{
     struct Thinker{

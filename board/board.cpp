@@ -42,26 +42,23 @@ const char board::Board::_initial_state[MAX] =
                     "                "
                     "                ";
 #else
-/*
 const char board::Board::_initial_state[MAX] = 
                     "                "
                     "                "
                     "                "
-                    "   defgkgfed    "
+                    "   d..gk....    "
+                    "   ....a....    "
+                    "   .CC......    "
                     "   .........    "
-                    "   .h.....h.    "
-                    "   i.i...i.i    "
-                    "   ....r....    "
-                    "   ......C..    "
-                    "   I.I.I...I    "
-                    "   .H.....H.    "
                     "   .........    "
-                    "   DEFGKGFED    "
+                    "   .........    "
+                    "   .........    "
+                    "   .........    "
+                    "   .........    "
+                    "   ...K.....    "
                     "                "
                     "                "
                     "                ";
-//这种情况黑方会车五进二吃兵, 目前框架理论上无法解决(因为吃兵也不是坏棋), 考虑使用双递归解决。
-*/
 #endif
 
 const std::unordered_map<std::string, std::string> board::Board::uni_pieces = {
