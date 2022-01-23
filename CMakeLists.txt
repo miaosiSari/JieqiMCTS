@@ -6,10 +6,7 @@ set(CMAKE_CXX_FLAGS "-O2 -g -Wall -Wextra")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 aux_source_directory(global/ DIR_SRCS)
 aux_source_directory(board/ DIR_SRCS)
-aux_source_directory(helper/ DIR_SRCS)
 aux_source_directory(. DIR_SRCS)
 add_subdirectory(pybind11)
-
-add_executable(cppjieqi ${DIR_SRCS})
-#pybind11_add_module(cppjieqi ${DIR_SRCS})
-
+pybind11_add_module(cppjieqi ${DIR_SRCS})
+execute_process(COMMAND "cp *.so ../python/")

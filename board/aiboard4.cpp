@@ -77,23 +77,29 @@ std::unordered_map<std::string, KONGTOUPAO_SCORE4> kongtoupao_score_bean4;
 std::unordered_map<std::string, THINKER4> thinker_bean4;
 
 
-board::AIBoard4::AIBoard4(const char another_state[MAX], bool turn, int round, const unsigned char di[2][123], short score, std::unordered_map<std::string, bool>* hist, \
+board::AIBoard4::AIBoard4(const char another_state[MAX], bool turn, int round, const unsigned char di[2][123], short score, \
     std::unordered_map<std::pair<uint32_t, bool>, std::pair<unsigned char, unsigned char>, myhash<uint32_t, bool>>* tp_move_bean, \
-    std::unordered_map<std::pair<uint32_t, int>, std::pair<short, short>, myhash<uint32_t, int>>* tp_score_bean) noexcept:  lastinsert(false),
-                                                                                                                            version(0), 
-                                                                                                                            round(round), 
-                                                                                                                            turn(turn), 
-                                                                                                                            original_turn(turn),
-                                                                                                                            zobrist_hash(0), 
-                                                                                                                            discount_factor(1.5),
-                                                                                                                            score(score),
-                                                                                                                            tp_move(tp_move_bean),
-                                                                                                                            tp_score(tp_score_bean),
-                                                                                                                            hist(hist),
-                                                                                                                            _myname("AI4"),
-                                                                                                                            _has_initialized(false),
-                                                                                                                            _score_func(NULL),
-                                                                                                                            _kongtoupao_score_func(NULL){
+    std::unordered_map<std::pair<uint32_t, int>, std::pair<short, short>, myhash<uint32_t, int>>* tp_score_bean, \
+    std::unordered_map<std::string, bool>* hist, \
+    short** pst, unsigned char** L1, char** _dir):  MINGZI("RNBAKCP"),
+                                                    lastinsert(false),
+                                                    version(0), 
+                                                    round(round), 
+                                                    turn(turn), 
+                                                    original_turn(turn),
+                                                    zobrist_hash(0), 
+                                                    discount_factor(1.5),
+                                                    score(score),
+                                                    tp_move(tp_move_bean),
+                                                    tp_score(tp_score_bean),
+                                                    hist(hist),
+                                                    pst(pst),
+                                                    L1(L1),
+                                                    _dir(_dir),
+                                                    _myname("AI4"),
+                                                    _has_initialized(false),
+                                                    _score_func(NULL),
+                                                    _kongtoupao_score_func(NULL){
     SetScoreFunction("complicated_score_function4", 0);
     SetScoreFunction("complicated_kongtoupao_score_function4", 1);
     score_cache.push(score);
@@ -119,8 +125,6 @@ void board::AIBoard4::SetScoreFunction(std::string function_name, int type){
         _score_func = GetWithDefUnordered<std::string, SCORE4>(score_bean4, function_name, complicated_score_function4);
     }else if(type == 1){
         _kongtoupao_score_func = GetWithDefUnordered<std::string, KONGTOUPAO_SCORE4>(kongtoupao_score_bean4, function_name, complicated_kongtoupao_score_function4);
-    }else if(type == 2){
-        _thinker_func = GetWithDefUnordered<std::string, THINKER4>(thinker_bean4, function_name, mtd_thinker4);
     }
 }
 
@@ -692,9 +696,67 @@ void board::AIBoard4::CopyData(const unsigned char di[2][123]){
     CalcVersion(0, discount_factor);
 }
 
-std::string board::AIBoard4::Think(){
-    SetScoreFunction("mtd_thinker4", 2);
-    return _thinker_func(this);
+bool board::AIBoard4::Think(int* src, int* dst){
+    constexpr short MATE_UPPER = 2600;
+    constexpr short EVAL_ROBUSTNESS = 15;
+    bool execute = false;
+    bool traverse_all_strategy = true;
+    int max_depth = (round < 15?6:7);
+    int quiesc_depth = (round < 15?1:0);
+    int depth = 0;
+    auto start = std::chrono::high_resolution_clock::now();
+    for(depth = 6; depth <= max_depth; ++depth){
+        short lower = -MATE_UPPER, upper = MATE_UPPER;
+        int me = 0, op = 0;
+        while(lower < upper - EVAL_ROBUSTNESS){
+            short gamma = (lower + upper + 1)/2; //不会溢出
+            short score = mtd_alphabeta4(this, gamma, depth + quiesc_depth, true, true, true, quiesc_depth, traverse_all_strategy, &me, &op);
+            if(me <= depth + quiesc_depth + 2 || op <= depth + quiesc_depth + 2){
+                execute = true;
+                break;
+            }
+            if(score >= gamma) { lower = score; }
+            if(score < gamma) { upper = score; }
+        }
+        if(!execute){
+            mtd_alphabeta4(this, lower, depth + quiesc_depth, true, true, true, quiesc_depth, traverse_all_strategy, &me, &op);
+            if(me <= depth + quiesc_depth + 2 || op <= depth + quiesc_depth + 2){
+                execute = true;
+            }
+        }
+        size_t int_ms = (size_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
+        if(execute || int_ms > 50000 || depth == max_depth){
+            Scan();
+            if(me <= 6 && (covered > 0 || covered_opponent > 0)){
+                short lower = -MATE_UPPER, upper = MATE_UPPER;
+                while(lower < upper - EVAL_ROBUSTNESS){
+                    short gamma = (lower + upper + 1)/2; //不会溢出
+                    short score = calleval4(this, gamma, {2, 3}, {true, false}, true, false);
+                    if(score >= gamma) { lower = score; }
+                    if(score < gamma) { upper = score; }
+                }
+                calleval4(this, lower, {2, 3}, {true, false}, true, false);
+            }
+            auto move = (*tp_move)[{zobrist_hash, turn}];
+            if(move == std::pair<unsigned char, unsigned char>({0, 0})){
+                unsigned char mate_src = 0, mate_dst = 0;
+                std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[MAX_POSSIBLE_MOVES];
+                int num_of_legal_moves_tmp = 0;
+                bool killer_is_alive = false;
+                short killer_score = 0;
+                GenMovesWithScore<true, false>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, killer_score, mate_src, mate_dst, killer_is_alive);
+                if(num_of_legal_moves_tmp != 0){
+                    *src = std::get<1>(legal_moves_tmp[0]);
+                    *dst = std::get<2>(legal_moves_tmp[0]);
+                    return false;
+                }
+            }
+            *src = move.first;
+            *dst = move.second;
+            return true;
+        }
+    }
+    return false;
 }
 
 void board::AIBoard4::PrintPos(bool turn) const{
@@ -756,11 +818,10 @@ void board::AIBoard4::print_raw_board(const char* board, const char* hint, Args.
     print_raw_board(args...);
 }
 
-inline short complicated_score_function4(board::AIBoard4* self, const char* state_pointer, unsigned char src, unsigned char dst){
+inline short complicated_score_function4(board::AIBoard4* bp, const char* state_pointer, unsigned char src, unsigned char dst){
     #define LOWER_BOUND -32768
     #define UPPER_BOUND 32767
     constexpr short MATE_UPPER = 2600;
-    board::AIBoard4* bp = reinterpret_cast<board::AIBoard4*>(self);
     int version = bp -> version;
     int turn = bp -> turn ? 1 : 0;
     int che_char = bp -> turn ? (int)'R': (int)'r';
@@ -785,7 +846,7 @@ inline short complicated_score_function4(board::AIBoard4* self, const char* stat
         return MATE_UPPER;
     }
     if(p == 'R' || p == 'N' || p == 'B' || p == 'A' || p == 'K' || p == 'C' || p == 'P'){
-        score =  pst[intp][dst] -  pst[intp][src];
+        score =  bp -> pst[intp][dst] -  bp -> pst[intp][src];
         
         if(p == 'R'){
             if(state_pointer[51] != 'd' && state_pointer[51] != 'r' && state_pointer[54] != 'a' && state_pointer[71] != 'a' && (state_pointer[71] == 'p' || state_pointer[87] != 'n')){
@@ -935,7 +996,7 @@ inline short complicated_score_function4(board::AIBoard4* self, const char* stat
     if(q >= 'A' && q <= 'Z'){
         int k = 254 - dst;
         if(q == 'R' || q == 'N' || q == 'B' || q == 'A' || q == 'C' || q == 'P'){
-            score +=  pst[intq][k];
+            score += bp -> pst[intq][k];
         }
         else{
             if(q != 'U'){
@@ -976,7 +1037,6 @@ inline void complicated_kongtoupao_score_function4(board::AIBoard4* bp, short* k
 void register_score_functions4(){
     score_bean4.insert({"complicated_score_function4", complicated_score_function4});
     kongtoupao_score_bean4.insert({"complicated_kongtoupao_score_function4", complicated_kongtoupao_score_function4});
-    thinker_bean4.insert({"mtd_thinker4", mtd_thinker4});
 }
 
 std::string SearchScoreFunction4(void* score_func, int type){
@@ -1005,68 +1065,6 @@ std::string SearchScoreFunction4(void* score_func, int type){
     return "";
 }
 
-
-std::string mtd_thinker4(board::AIBoard4* bp){
-    constexpr short MATE_UPPER = 2600;
-    constexpr short EVAL_ROBUSTNESS = 15;
-    bool execute = false;
-    bp -> Scan();
-    bool traverse_all_strategy = true;
-    int max_depth = (bp -> round < 15?6:7);
-    int quiesc_depth = (bp -> round < 15?1:0);
-    int depth = 0;
-    auto start = std::chrono::high_resolution_clock::now();
-    for(depth = 6; depth <= max_depth; ++depth){
-        short lower = -MATE_UPPER, upper = MATE_UPPER;
-        int me = 0, op = 0;
-        while(lower < upper - EVAL_ROBUSTNESS){
-            short gamma = (lower + upper + 1)/2; //不会溢出
-            short score = mtd_alphabeta4(bp, gamma, depth + quiesc_depth, true, true, true, quiesc_depth, traverse_all_strategy, &me, &op);
-            if(me <= depth + quiesc_depth + 2 || op <= depth + quiesc_depth + 2){
-                execute = true;
-                break;
-            }
-            if(score >= gamma) { lower = score; }
-            if(score < gamma) { upper = score; }
-        }
-        if(!execute){
-            mtd_alphabeta4(bp, lower, depth + quiesc_depth, true, true, true, quiesc_depth, traverse_all_strategy, &me, &op);
-            if(me <= depth + quiesc_depth + 2 || op <= depth + quiesc_depth + 2){
-                execute = true;
-            }
-        }
-        size_t int_ms = (size_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-        if(execute || int_ms > 50000 || depth == max_depth){
-            bp -> Scan();
-            if(me <= 6 && (bp -> covered > 0 || bp -> covered_opponent > 0)){
-                short lower = -MATE_UPPER, upper = MATE_UPPER;
-                while(lower < upper - EVAL_ROBUSTNESS){
-                    short gamma = (lower + upper + 1)/2; //不会溢出
-                    short score = calleval4(bp, gamma, {2, 3}, {true, false}, true, false);
-                    if(score >= gamma) { lower = score; }
-                    if(score < gamma) { upper = score; }
-                }
-                calleval4(bp, lower, {2, 3}, {true, false}, true, false);
-            }
-            auto move = (*bp -> tp_move)[{bp -> zobrist_hash, bp -> turn}];
-            if(move == std::pair<unsigned char, unsigned char>({0, 0})){
-                unsigned char mate_src = 0, mate_dst = 0;
-                std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[MAX_POSSIBLE_MOVES];
-                int num_of_legal_moves_tmp = 0;
-                bool killer_is_alive = false;
-                short killer_score = 0;
-                bp -> GenMovesWithScore<true, false>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, killer_score, mate_src, mate_dst, killer_is_alive);
-                std::cout << "My name: " << bp -> GetName() <<" [AM I FAILED?]" << num_of_legal_moves_tmp << " My move: " << bp -> translate_ucci(std::get<1>(legal_moves_tmp[0]), std::get<2>(legal_moves_tmp[0])) << ", duration = " << int_ms << ", depth = " << depth + quiesc_depth << "." << std::endl;
-                if(num_of_legal_moves_tmp != 0){
-                    return bp -> translate_ucci(std::get<1>(legal_moves_tmp[0]), std::get<2>(legal_moves_tmp[0]));
-                }
-            }
-            std::cout << "My name: " << bp -> GetName()  << " My move: " << bp -> translate_ucci(move.first, move.second) << ", duration = " << int_ms << ", depth = " << depth + quiesc_depth << "." << std::endl;
-            return bp -> translate_ucci(move.first, move.second);
-        }
-    }
-    return "";
-}
 
 short mtd_quiescence4(board::AIBoard4* self, const short gamma, int quiesc_depth, const bool root, int* me, int* op){
     constexpr short MATE_UPPER = 2600;
@@ -1460,7 +1458,7 @@ void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsig
         char c = uncertainty_dict[key];
         switch(c){
             case 'U': {
-                for(char c : MINGZI){
+                for(char c : self -> MINGZI){
                     int intchar = turn ? (int)c : ((int)c) ^ 32;
                     if(self -> aidi[ver][turn][intchar] > 0){
                         --self -> aidi[ver][turn][intchar];
@@ -1470,7 +1468,7 @@ void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsig
                         state_pointer[key] = c;
                         state_pointer_oppo[254 - key] = self -> swapcase(c);
                         self -> zobrist_hash ^= self -> zobrist[(int)self -> state_red[zobrist_key]][zobrist_key];
-                        short score_diff = pst[(int)c][key] - self -> aiaverage[ver-1][turn][1][key];
+                        short score_diff = self -> pst[(int)c][key] - self -> aiaverage[ver-1][turn][1][key];
                         _inner_recur(self, ver, uncertainty_dict, uncertainty_keys, result_dict, counter_dict, index+1, me*(self -> aidi[ver][turn][intchar] + 1), op, pruning, score + score_diff/2, gamma, depths, \
                             traverse_all_strategies, nullmove, nullmove_now, discount_factor);
                         state_pointer[key] = 'U';
@@ -1483,7 +1481,7 @@ void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsig
             }
 
             case 'u': {
-                for(char c: MINGZI){
+                for(char c: self -> MINGZI){
                     int intchar = notturn ? (int)c : ((int)c) ^ 32;
                     if(self -> aidi[ver][notturn][intchar] > 0){
                         --self -> aidi[ver][notturn][intchar];
@@ -1493,7 +1491,7 @@ void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsig
                         state_pointer[key] = self -> swapcase(c);
                         state_pointer_oppo[254 - key] = c;
                         self -> zobrist_hash ^= self -> zobrist[(int)self -> state_red[zobrist_key]][zobrist_key];
-                        short score_diff = pst[(int)c][254 - key] - self -> aiaverage[ver-1][notturn][1][254 - key];
+                        short score_diff = self -> pst[(int)c][254 - key] - self -> aiaverage[ver-1][notturn][1][254 - key];
                         _inner_recur(self, ver, uncertainty_dict, uncertainty_keys, result_dict, counter_dict, index+1, me, op*(self -> aidi[ver][notturn][intchar] + 1), pruning, score-score_diff/2, gamma, depths, \
                             traverse_all_strategies, nullmove, nullmove_now, discount_factor);
                         state_pointer[key] = 'u';

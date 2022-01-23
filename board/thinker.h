@@ -8,7 +8,7 @@ namespace board{
         bool thinker_type; //true: Human, false: AI
         int retry_num;
         bool turn;
-        virtual std::string Think() = 0;
+        virtual bool Think(int* src, int* dst) = 0;
     };
 }
 

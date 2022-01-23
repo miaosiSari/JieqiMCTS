@@ -17,6 +17,7 @@
 #define SOUTH 16
 #define WEST -1
 
+#include <pybind11/pybind11.h>
 #include <cstddef>
 #include <vector>
 #include <string>
@@ -35,7 +36,8 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "../global/global.h"
-extern const std::string MINGZI;
+
+namespace py = pybind11;
 
 #define TXY(x, y) (unsigned char)translate_x_y(x, y)
 #ifdef WIN32
@@ -85,14 +87,17 @@ public:
     unsigned char di[2][123];
     unsigned char di_red[2][123];
     unsigned char di_black[2][123];
+    const std::string MINGZI;
     bool finished = false;
     char state_red[MAX];
     char state_black[MAX];
     bool turn; //true红black黑
     int round; //回合, 从0开始
+    short** pst;
     std::unordered_map<std::string, bool> hist;
     static const std::unordered_map<std::string, std::string> uni_pieces;
-    Board() noexcept;
+    Board()=delete;
+    Board(short**pst, char** _dir) noexcept;
     ~Board();
     void Reset(std::unordered_map<bool, std::unordered_map<unsigned char, char>>* random_map);
     void initialize_di();
@@ -106,10 +111,10 @@ public:
     void PrintPos(bool turn, bool iscovered, bool god, bool swapcasewhenblack) const;
     void PrintPos() const;
     std::shared_ptr<InfoDict> Move(const std::string ucci, const bool = false); //ucci representation
-    std::shared_ptr<InfoDict> Move(const int x1, const int y1, const int x2, const int y2, const bool = false);
+    std::shared_ptr<InfoDict> Move(const int encode_from, const int encode_to, const bool = false);
     void UndoMove();
     void DebugDI();
-    void GenMoves();
+    py::list GenMoves(bool withpython);
     std::string GenRandomMove();
     void GenRandomMap();
     void PrintRandomMap();
@@ -161,13 +166,13 @@ public:
     static void Print_ij_ucci(unsigned char i, unsigned char j);
    
 private:
+    char** _dir;
     bool _has_initialized;
     bool _is_legal_move[MAX][MAX];
     std::vector<std::string> _cur_legal_moves;
     std::vector<std::string> _board_history;
     static const int _chess_board_size;
     static const char _initial_state[MAX];
-    static char _dir[91][8];
     std::function<std::string(const char)> _getstring = [](const char c) -> std::string {
         std::string ret;
         const std::string c_string(1, c);
@@ -188,7 +193,6 @@ private:
         c = (swapcasewhenblack && !turn)?swapcase(c):c;
         return _getstring(c);
     };
-    void _initialize_dir();
 };
 }
 

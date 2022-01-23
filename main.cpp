@@ -1,32 +1,26 @@
 // copyright 2021 miaosi@all rights reserved.
-//#include <pybind11/pybind11.h>
+#include <pybind11/pybind11.h>
 #include <stdio.h>
 #include <iostream>
 #include <time.h>
-#include "global/global.h"
 #include "board/god.h"
 #include "board/board.h"
 
-/*
+
 namespace py = pybind11;
 
-int k = 2;
-int add(int i, int j) {
-    return i + j + k;
-}
-
 PYBIND11_MODULE(cppjieqi, m) {
-    m.doc() = "pybind11 example plugin";
-    m.def("add", &add, "A function which adds two numbers");
+    py::class_<God>(m, "God")
+        .def(py::init<>())
+        .def("Initialize", &God::Initialize, py::arg("random") = true)
+        .def("PrintPos", &God::PrintPos)
+        .def("GetTurn", &God::GetTurn)
+        .def("GetMeta", &God::GetMeta)
+        .def("Move", py::overload_cast<const int, const int>(&God::Move))
+        .def("Move", py::overload_cast<std::string>(&God::Move))
+        .def("UndoMove", &God::UndoMove, py::arg("undo_times") = 1)
+        .def("GenMoves", &God::GenMoves)
+        .def("AIHint", &God::AIHint)
+        .def("Single", &God::translate_single)
+        .def("UCCI", &God::translate_ucci);
 } 
-*/
-
-extern God* g;
-
-int main(void) {
-    srand(time(NULL));
-    g = new God("../players.conf");
-    DEBUG ? g -> StartGame() : g -> StartGameLoopAlternatively();
-    delete g;
-    return 0;
-}
