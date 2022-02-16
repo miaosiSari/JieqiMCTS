@@ -1067,7 +1067,7 @@ short alphabeta4(board::AIBoard4* self, short alpha, short beta, int depth, int 
             self -> UndoMove(1);
             DECISION(killer_src, killer_dst, true, killer_score);
             if(type == ROOT && valdict){
-                (*valdict)[py::str(ucci)] = killer_score;
+                (*valdict)[py::str(ucci)] = val;
             }
         }
         for(int i = 0; i < num_of_legal_moves_tmp; ++i){
@@ -1084,7 +1084,7 @@ short alphabeta4(board::AIBoard4* self, short alpha, short beta, int depth, int 
             self -> UndoMove(1);
             DECISION(src, dst, false, score);
             if(type == ROOT && valdict){
-                (*valdict)[py::str(ucci)] = killer_score;
+                (*valdict)[py::str(ucci)] = val;
             }
         }
     }while(false);
