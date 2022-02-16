@@ -1,0 +1,10 @@
+from cppjieqi import *
+s = Searcher()
+s.Initialize()
+p = s.get()
+print(p.pa())
+print(p.UCT(1))
+print(s.UCT())
+s.expand({"abcd": 0.5})
+print(s.UCT())
+print(s.get())

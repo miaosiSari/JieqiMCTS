@@ -41,35 +41,6 @@ const char board::Board::_initial_state[MAX] =
 #endif
 
 const std::unordered_map<std::string, std::string> board::Board::uni_pieces = {
-	#ifdef WIN32
-	{".", "．"},
-    {"R", "俥"},
-    {"N", "傌"},
-    {"B", "相"},
-    {"A", "仕"},
-    {"K", "帅"},
-    {"P", "兵"},
-    {"C", "炮"},
-    {"D", "红"},
-    {"E", "红"},
-    {"F", "红"},
-    {"G", "红"},
-    {"H", "红"},
-    {"I", "红"},
-    {"r", "车"},
-    {"n", "马"},
-    {"b", "象"},
-    {"a", "士"},
-    {"k", "将"},
-    {"p", "卒"},
-    {"c", "包"},
-    {"d", "黑"},
-    {"e", "黑"},
-    {"f", "黑"},
-    {"g", "黑"},
-    {"h", "黑"},
-    {"i", "黑"}
-	#else
     {".", "．"},
     {"R", "\033[31m俥\033[0m"},
     {"N", "\033[31m傌\033[0m"},
@@ -97,27 +68,27 @@ const std::unordered_map<std::string, std::string> board::Board::uni_pieces = {
     {"g", "暗"},
     {"h", "暗"},
     {"i", "暗"}
-	#endif
 };
 
 board::Board::Board(short** pst, char** _dir) noexcept: MINGZI("RNBAKCP"),
                       finished(false),
                       turn(true),
                       round(0),
+                      state(DRAW),
                       pst(pst),
+                      redplaces({195, 196, 197, 198, 200, 201, 202, 203, 164, 170, 147, 149, 151, 153, 155}),
+                      blackplaces({59, 58, 57, 56, 54, 53, 52, 51, 90, 84, 107, 105, 103, 101, 99}),
+                      LUT(
+                      {
+                        {51, 'd'}, {52, 'e'}, {53, 'f'}, {54, 'g'}, {56, 'g'}, {57, 'f'}, {58, 'e'}, {59, 'd'}, {84, 'h'}, {90, 'h'}, {99, 'i'}, {101, 'i'}, {103, 'i'}, {105, 'i'}, {107, 'i'},
+                        {147, 'I'}, {149, 'I'}, {151, 'I'}, {153, 'I'}, {155, 'I'}, {164, 'H'}, {170, 'H'}, {195, 'D'}, {196, 'E'}, {197, 'F'}, {198, 'G'}, {200, 'G'}, {201, 'F'}, {202, 'E'}, {203, 'D'}
+                      }),
                       _dir(_dir),
                       _has_initialized(false){
     memset(state_red, 0, sizeof(state_red));
     memset(state_black, 0, sizeof(state_black));
     strncpy(state_red, _initial_state, _chess_board_size);
     strncpy(state_black, _initial_state, _chess_board_size);
-    #if DEBUG
-    if(turn){
-        rotate(state_black);
-    }else{
-        rotate(state_red);
-    }
-    #endif
     memset(_is_legal_move, false, sizeof(_is_legal_move));
     memset(legal_moves, 0, sizeof(legal_moves));
     GenRandomMap();
@@ -137,41 +108,68 @@ board::Board::~Board(){
     }
 }
 
-void board::Board::Reset(std::unordered_map<bool, std::unordered_map<unsigned char, char>>* random_map){
+void board::Board::Reset(bool turn, std::string* board){
+    std::function<std::string(int, int)> king = [](int i, int j) -> std::string {
+        return "King Error: RedKing==" + std::to_string(i) + ", BlackKing==" + std::to_string(j);
+    };
+    std::function<std::string(int, char)> dark = [](int i, char j) -> std::string {
+        return "Dark Error: Pos==" + std::to_string(i) + ", value==" + std::string(1, j);
+    };
     hist.clear();
     finished = false;
-    turn = true;
+    this -> turn = turn;
     round = 0;
+    state = DRAW;
     memset(state_red, 0, sizeof(state_red));
     memset(state_black, 0, sizeof(state_black));
-    strncpy(state_red, _initial_state, _chess_board_size);
-    strncpy(state_black, _initial_state, _chess_board_size);
-    #if DEBUG
-    if(turn){
-        rotate(state_black);
+    if(board){
+        std::set<int> shuaiplaces = {198, 199, 200, 182, 183, 184, 166, 167, 168}, jiangplaces = {54, 55, 56, 70, 71, 72, 86, 87, 88};
+        strncpy(state_red, board -> c_str(), _chess_board_size);
+        strncpy(state_black, board -> c_str(), _chess_board_size);
+        if(turn){
+            rotate(state_black);
+        }else{
+            rotate(state_red);
+        }
+        int K = 0, k = 0;
+        for(int i = 51; i <= 203; ++i){
+            if(state_red[i] == 'K'){
+                ++K;
+                if(shuaiplaces.find(i) == shuaiplaces.end()){
+                    throw Exception{"We find K at " + std::to_string(i) + "!"};
+                }
+            }else if(state_red[i] == 'k'){
+                ++k;
+                if(jiangplaces.find(i) == jiangplaces.end()){
+                    throw Exception{"We find k at " + std::to_string(i) + "!"};
+                }
+            }
+            if(K > 1 || k > 1){
+                throw Exception{king(K, k)};
+            }
+            if((state_red[i] >= 'D' && state_red[i] <= 'I') || (state_red[i] >= 'd' && state_red[i] <= 'i')){
+                if(LUT.find(i) == LUT.end() || LUT[i] != state_red[i]){
+                    throw Exception{dark(i, state_red[i])};   
+                }
+            }
+        }
+        if(K != 1 || k != 1){
+            throw Exception{king(K, k)};
+        }
     }else{
-        rotate(state_red);
+        strncpy(state_red, _initial_state, _chess_board_size);
+        strncpy(state_black, _initial_state, _chess_board_size);
     }
-    #endif
     state_red[_chess_board_size] = '\0';
     state_black[_chess_board_size] = '\0';
     memset(_is_legal_move, false, sizeof(_is_legal_move));
-    if(random_map){
-        this -> random_map = std::move(*random_map);
-    }else{
-        GenRandomMap();
-    }
+    GenRandomMap();
     hist[state_red] = false;
     initialize_di();
-    #if DEBUG && BLACK
-    turn = false;
-    #endif
 }
 
 void board::Board::initialize_di(){
     memset(this -> di, 0, sizeof(this -> di));
-    std::unordered_set<int> redplaces = {195, 196, 197, 198, 200, 201, 202, 203, 164, 170, 147, 149, 151, 153, 155};
-    std::unordered_set<int> blackplaces = {59, 58, 57, 56, 54, 53, 52, 51, 90, 84, 107, 105, 103, 101, 99};
     for(int pos: redplaces){
         if(random_map[true].find(pos) == random_map[true].end()){
             continue;
@@ -306,7 +304,11 @@ std::shared_ptr<InfoDict> board::Board::Move(const int encode_from, const int en
         assert(swapcase(state_black[encode_to]) == state_red[reverse_encode_to]);
         state_red[reverse_encode_from] = '.';
     }
-    std::shared_ptr<InfoDict> p(new InfoDict(true, (eat == 'k'), eat, eat_type, eat_check));
+    finished = (eat == 'k');
+    std::shared_ptr<InfoDict> p(new InfoDict(true, finished, eat, eat_type, eat_check));
+    if(finished){
+        state = turn ? REDWIN : BLACKWIN;
+    }
     turn = !turn;
     hist[state_red] = turn;
     if(turn){
@@ -344,7 +346,6 @@ void board::Board::DebugDI(){
 }
 
 py::list board::Board::GenMoves(bool withpython){
-    printf("%d\n", withpython);
     memset(_is_legal_move, false, sizeof(_is_legal_move));
     const char *_state_pointer = turn?state_red:state_black;
     py::list returnlist;
@@ -553,7 +554,11 @@ void board::Board::PrintRandomMap(){
     }
 }
 
-void board::Board::GenRandomBoard(){
+void board::Board::GenRandomBoard(bool turn){
+    finished = false;
+    this -> turn = turn;
+    round = 0;
+    state = DRAW;
     srand(time(NULL));
     memset(state_red, ' ', sizeof(state_red));
     memset(state_black, ' ', sizeof(state_black));
@@ -568,10 +573,6 @@ void board::Board::GenRandomBoard(){
         all_places.insert(i);
         state_red[i] = '.';
     }
-    std::unordered_map<unsigned char, char> LUT = {
-        {51, 'd'}, {52, 'e'}, {53, 'f'}, {54, 'g'}, {56, 'g'}, {57, 'f'}, {58, 'e'}, {59, 'd'}, {84, 'h'}, {90, 'h'}, {99, 'i'}, {101, 'i'}, {103, 'i'}, {105, 'i'}, {107, 'i'},
-        {147, 'I'}, {149, 'I'}, {151, 'I'}, {153, 'I'}, {155, 'I'}, {164, 'H'}, {170, 'H'}, {195, 'D'}, {196, 'E'}, {197, 'F'}, {198, 'G'}, {200, 'G'}, {201, 'F'}, {202, 'E'}, {203, 'D'}
-    };
     for(std::unordered_map<unsigned char, char>::iterator it = LUT.begin(); it != LUT.end(); ++it){
         unsigned char pos = it -> first;
         char c = it -> second;

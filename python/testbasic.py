@@ -20,8 +20,4 @@ one = random.sample(g.GenMoves(), 1)
 g.PrintPos()
 g.UndoMove(2)
 assert g.GetMeta()["state_red"] == state_red and g.GetMeta()["di1"] == di1 and g.GetMeta()["di0"] == di0
-
-
-
-
-
+print(di0)

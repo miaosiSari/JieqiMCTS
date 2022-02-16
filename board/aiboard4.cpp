@@ -1,24 +1,8 @@
 #include "aiboard4.h"
 
+char LUT4[256];
 
-std::unordered_map<int, char> LUT4 = {
-   {195, 'D'},
-   {196, 'E'},
-   {197, 'F'},
-   {198, 'G'},
-   {200, 'G'},
-   {201, 'F'},
-   {202, 'E'},
-   {203, 'D'},
-   {164, 'H'},
-   {170, 'H'},
-   {147, 'I'},
-   {149, 'I'},
-   {151, 'I'},
-   {153, 'I'},
-   {155, 'I'}
-};
-
+bool board::AIBoard4::has_initialized = false;
 const int board::AIBoard4::_chess_board_size = CHESS_BOARD_SIZE;
 const char board::AIBoard4::_initial_state[MAX] = 
                     "                "
@@ -75,34 +59,27 @@ const std::unordered_map<std::string, std::string> board::AIBoard4::_uni_pieces 
 std::unordered_map<std::string, SCORE4> score_bean4;
 std::unordered_map<std::string, KONGTOUPAO_SCORE4> kongtoupao_score_bean4;
 std::unordered_map<std::string, THINKER4> thinker_bean4;
+static std::string MINGZI = "RNBAKCP";
 
-
-board::AIBoard4::AIBoard4(const char another_state[MAX], bool turn, int round, const unsigned char di[2][123], short score, \
-    std::unordered_map<std::pair<uint32_t, bool>, std::pair<unsigned char, unsigned char>, myhash<uint32_t, bool>>* tp_move_bean, \
-    std::unordered_map<std::pair<uint32_t, int>, std::pair<short, short>, myhash<uint32_t, int>>* tp_score_bean, \
-    std::unordered_map<std::string, bool>* hist, \
-    short** pst, unsigned char** L1, char** _dir):  MINGZI("RNBAKCP"),
-                                                    lastinsert(false),
-                                                    version(0), 
-                                                    round(round), 
-                                                    turn(turn), 
-                                                    original_turn(turn),
-                                                    zobrist_hash(0), 
-                                                    discount_factor(1.5),
-                                                    score(score),
-                                                    tp_move(tp_move_bean),
-                                                    tp_score(tp_score_bean),
-                                                    hist(hist),
-                                                    pst(pst),
-                                                    L1(L1),
-                                                    _dir(_dir),
-                                                    _myname("AI4"),
-                                                    _has_initialized(false),
-                                                    _score_func(NULL),
-                                                    _kongtoupao_score_func(NULL){
+board::AIBoard4::AIBoard4(const char another_state[MAX], bool turn, int round, unsigned char di[2][123], tp* tptable, short** pst, unsigned char** L1, char** _dir) noexcept: 
+                                                                                                                            ply(0),
+                                                                                                                            version(0), 
+                                                                                                                            round(round), 
+                                                                                                                            turn(turn), 
+                                                                                                                            original_turn(turn),
+                                                                                                                            original_depth(0),
+                                                                                                                            zobrist_hash(0), 
+                                                                                                                            discount_factor(1.5),
+                                                                                                                            score(0),
+                                                                                                                            tptable(tptable),
+                                                                                                                            pst(pst),
+                                                                                                                            L1(L1),
+                                                                                                                            _dir(_dir),
+                                                                                                                            _has_initialized(false),
+                                                                                                                            _score_func(NULL),
+                                                                                                                            _kongtoupao_score_func(NULL){
     SetScoreFunction("complicated_score_function4", 0);
     SetScoreFunction("complicated_kongtoupao_score_function4", 1);
-    score_cache.push(score);
     memset(state_red, 0, sizeof(state_red));
     memset(state_black, 0, sizeof(state_black));
     strncpy(state_red, another_state, _chess_board_size);
@@ -117,6 +94,10 @@ board::AIBoard4::AIBoard4(const char another_state[MAX], bool turn, int round, c
     zobrist_cache.insert((zobrist_hash << 1)|original_turn);
     Scan();
     register_score_functions4();
+    if(!has_initialized){
+        INITIALIZELUT4
+    }
+    has_initialized = true;
     _has_initialized = true;
 }
 
@@ -125,6 +106,8 @@ void board::AIBoard4::SetScoreFunction(std::string function_name, int type){
         _score_func = GetWithDefUnordered<std::string, SCORE4>(score_bean4, function_name, complicated_score_function4);
     }else if(type == 1){
         _kongtoupao_score_func = GetWithDefUnordered<std::string, KONGTOUPAO_SCORE4>(kongtoupao_score_bean4, function_name, complicated_kongtoupao_score_function4);
+    }else if(type == 2){
+        _thinker_func = GetWithDefUnordered<std::string, THINKER4>(thinker_bean4, function_name, thinker4);
     }
 }
 
@@ -142,69 +125,93 @@ std::string board::AIBoard4::SearchScoreFunction(int type){
 bool board::AIBoard4::Move(const unsigned char encode_from, const unsigned char encode_to, short score_step){
     const unsigned char reverse_encode_from = reverse(encode_from);
     const unsigned char reverse_encode_to = reverse(encode_to);
+    score_cache.push({che, che_opponent, zu, zu_opponent,score, zobrist_hash});
     if(turn){
         cache.push({encode_from, encode_to, state_red[encode_to]});
+        switch(state_red[encode_to]){
+            case 'r': --che_opponent; break;
+            case 'p': --zu_opponent; break;
+        }
         zobrist_hash ^= zobrist[(int)state_red[encode_to]][encode_to];
         zobrist_hash ^= zobrist[(int)state_red[encode_from]][encode_from];
         if(state_red[encode_from] >= 'D' && state_red[encode_from] <= 'I'){
             state_red[encode_to] = 'U';
-            state_red[encode_from] = '.';
             state_black[reverse_encode_to] = 'u';
-            state_black[reverse_encode_from] = '.';
         }else{
             state_red[encode_to] = state_red[encode_from];
-            state_red[encode_from] = '.';
             state_black[reverse_encode_to] = state_black[reverse_encode_from];
-            state_black[reverse_encode_from] = '.';
         }
+        state_red[encode_from] = '.';
+        state_black[reverse_encode_from] = '.';
         zobrist_hash ^= zobrist[(int)state_red[encode_to]][encode_to];
     } else{
         cache.push({encode_from, encode_to, state_black[encode_to]});
+        switch(state_black[encode_to]){
+            case 'r': --che_opponent; break;
+            case 'p': --zu_opponent; break;
+        }
         zobrist_hash ^= zobrist[(int)state_red[reverse_encode_to]][reverse_encode_to];
         zobrist_hash ^= zobrist[(int)state_red[reverse_encode_from]][reverse_encode_from];
         if(state_black[encode_from] >= 'D' && state_black[encode_from] <= 'I'){
             state_black[encode_to] = 'U';
-            state_black[encode_from] = '.';
             state_red[reverse_encode_to] = 'u';
-            state_red[reverse_encode_from] = '.';
         }else{
             state_black[encode_to] = state_black[encode_from];
-            state_black[encode_from] = '.';
             state_red[reverse_encode_to] = state_red[reverse_encode_from];
-            state_red[reverse_encode_from] = '.';
         }
+        state_black[encode_from] = '.';
+        state_red[reverse_encode_from] = '.';
         zobrist_hash ^= zobrist[(int)state_red[reverse_encode_to]][reverse_encode_to];
     }
     turn = !turn;
+    std::swap(che, che_opponent);
+    std::swap(zu, zu_opponent);
+    std::swap(covered, covered_opponent);
     score = -(score + score_step);
     if(turn){
        ++round;
     }
-    score_cache.push(score);
     auto zobrist_turn = (zobrist_hash << 1)|turn;
     bool retval = (zobrist_cache.find(zobrist_turn) == zobrist_cache.end());
     if(retval){
         zobrist_cache.insert(zobrist_turn);
-        Scan();
     }
-    lastinsert = retval;
+    lastinserts.push_back(retval);
+    ++ply;
     return retval;
 }
 
-void board::AIBoard4::NULLMove(){
+bool board::AIBoard4::NULLMove(){
+    score_cache.push({che, che_opponent, zu, zu_opponent, score, zobrist_hash});
+    std::swap(che, che_opponent);
+    std::swap(zu, zu_opponent);
+    std::swap(covered, covered_opponent);
     turn = !turn;
-    zobrist_cache.insert((zobrist_hash << 1)|turn);
+    auto zobrist_turn = (zobrist_hash << 1)|turn;
+    bool retval = (zobrist_cache.find(zobrist_turn) == zobrist_cache.end());
     score = -score;
-    score_cache.push(score);
-    Scan();
+    if(retval){
+        zobrist_cache.insert(zobrist_turn);
+    }
+    lastinserts.push_back(retval);
+    ++ply;
+    return retval;
 }
 
 void board::AIBoard4::UndoMove(int type){
+    gameinfo g = score_cache.top();
+    che = g.che;
+    che_opponent = g.che_opponent;
+    zu = g.zu;
+    zu_opponent = g.zu_opponent;
+    score = g.score;
+    std::swap(covered, covered_opponent);
     score_cache.pop();
-    score = score_cache.top();
-    if(lastinsert){
+    if(!lastinserts.empty() && lastinserts.back()){
         zobrist_cache.erase((zobrist_hash<<1)|turn);
     }
+    lastinserts.pop_back();
+    zobrist_hash = g.zobrist_hash;
     if(type == 1){//非空移动
         const std::tuple<unsigned char, unsigned char, char> from_to_eat = cache.top();
         cache.pop();
@@ -218,7 +225,6 @@ void board::AIBoard4::UndoMove(int type){
         const unsigned char reverse_encode_from = reverse(encode_from);
         const unsigned char reverse_encode_to = reverse(encode_to);
         if(turn){
-            zobrist_hash ^= zobrist[(int)state_red[encode_to]][encode_to];
             if(state_red[encode_to] == 'U'){
                 state_red[encode_from] = LUT4[encode_from];
                 state_red[encode_to] = eat;
@@ -230,10 +236,7 @@ void board::AIBoard4::UndoMove(int type){
                 state_black[reverse_encode_from] = state_black[reverse_encode_to];
                 state_black[reverse_encode_to] = swapcase(eat);
             }
-            zobrist_hash ^= zobrist[(int)state_red[encode_from]][encode_from];
-            zobrist_hash ^= zobrist[(int)state_red[encode_to]][encode_to];
         }else{
-            zobrist_hash ^= zobrist[(int)state_red[reverse_encode_to]][reverse_encode_to];
             if(state_black[encode_to] == 'U'){
                 state_black[encode_from] = LUT4[encode_from];
                 state_black[encode_to] = eat;
@@ -245,13 +248,11 @@ void board::AIBoard4::UndoMove(int type){
                 state_red[reverse_encode_from] = state_red[reverse_encode_to];
                 state_red[reverse_encode_to] = swapcase(eat);
             }
-            zobrist_hash ^= zobrist[(int)state_red[reverse_encode_from]][reverse_encode_from];
-            zobrist_hash ^= zobrist[(int)state_red[reverse_encode_to]][reverse_encode_to];
         }
-        //Scan(); //这里不需要再Scan，因为Scan是用来统计移动分数的和Quiescence的，Move之前就应该已经统计完成
     }else if(type == 0){
         turn = !turn;
     }
+    --ply;
 }
 
 void board::AIBoard4::Scan(){
@@ -259,10 +260,9 @@ void board::AIBoard4::Scan(){
     che = 0;
     che_opponent = 0;
     zu = 0;
+    zu_opponent = 0;
     covered = 0;
     covered_opponent = 0;
-    endline = 0;
-    score_rough = 0;
     kongtoupao = 0;
     kongtoupao_opponent = 0;
     kongtoupao_score = 0;
@@ -275,7 +275,6 @@ void board::AIBoard4::Scan(){
             ++all;
         }
         if(p == 'R' || p == 'N' || p == 'B' || p == 'A' || p == 'K' || p == 'C' || p == 'P'){
-            score_rough += pst[(int)p][i];
             if(p == 'R'){
                ++che;
             }else if(p == 'P'){
@@ -286,20 +285,19 @@ void board::AIBoard4::Scan(){
             ++covered;
         }
         else if(p == 'U'){
-            score_rough += aiaverage[version][turn?1:0][1][i];
             ++covered;
         }
         else if(p == 'r' || p == 'n' || p == 'b' || p == 'a' || p == 'k' || p == 'c' || p == 'p'){
-            score_rough -= pst[((int)p) ^ 32][254 - i];
             if(p == 'r'){
                ++che_opponent;
+            }else if(p == 'p'){
+               ++zu_opponent;
             }
         }
         else if(p >= 'd' && p <= 'i'){
             ++covered_opponent;
         }  
         else if(p == 'u'){
-            score_rough -= aiaverage[version][turn?0:1][1][254 - i];
             ++covered_opponent;
         }
         if(p == 'C' && ((i & 15) == 7)){
@@ -424,11 +422,10 @@ void board::AIBoard4::KongTouPao(const char* _state_pointer, int pos, bool mysel
     } //else
 } //KongTouPao
 
-template<bool needscore, bool return_after_mate>
-bool board::AIBoard4::GenMovesWithScore(std::tuple<short, unsigned char, unsigned char> legal_moves[MAX_POSSIBLE_MOVES], int& num_of_legal_moves, std::pair<unsigned char, unsigned char>* killer, short& killer_score, unsigned char& mate_src, unsigned char& mate_dst, bool& killer_is_alive){
+template<bool needscore>
+bool board::AIBoard4::GenMovesWithScore(scoretuple legal_moves[MAX_POSSIBLE_MOVES], int& num_of_legal_moves, std::pair<unsigned char, unsigned char>* killer, short& killer_score, unsigned char& mate_src, unsigned char& mate_dst, bool& killer_is_alive){
     num_of_legal_moves = 0;
     killer_score = 0;
-    bool mate = false;
     killer_is_alive = false;
     const char *_state_pointer = turn?state_red:state_black;
     for(unsigned char i = 51; i <= 203; ++i){
@@ -452,35 +449,18 @@ bool board::AIBoard4::GenMovesWithScore(std::tuple<short, unsigned char, unsigne
                     }
                     if(cfoot == 0){
                         if(q == '.'){
-                            short score_tmp = 0;
-                            if(needscore){
-                                score_tmp = _score_func(this, _state_pointer, i, j);
-                            }
-                            legal_moves[num_of_legal_moves] = std::make_tuple(score_tmp, i, j);
-                            if(killer && killer -> first == i && killer -> second == j && needscore){
-                                killer_score = score_tmp;
-                                killer_is_alive = true;
-                            }
+                            legal_moves[num_of_legal_moves] = MAKETUPLE(0, i, j);
                             ++num_of_legal_moves;
                         } else{
                             ++cfoot;
                         }
                     }else{
                         if(islower(q)) {
-                            short score_tmp = 0;
-                            if(needscore){
-                                score_tmp = _score_func(this, _state_pointer, i, j);
-                            }
-                            legal_moves[num_of_legal_moves] = std::make_tuple(score_tmp, i, j);
-                            if(killer && killer -> first == i && killer -> second == j && needscore){
-                                killer_score = score_tmp;
-                                killer_is_alive = true;
-                            }
+                            legal_moves[num_of_legal_moves] = MAKETUPLE(0, i, j);
                             ++num_of_legal_moves;
                             if(q == 'k') { 
-                                mate = true; 
                                 mate_src = i, mate_dst = j;
-                                if(return_after_mate){ return true; }
+                                return true;
                             }
                             break;
                         } else if(isupper(q)) {
@@ -495,19 +475,10 @@ bool board::AIBoard4::GenMovesWithScore(std::tuple<short, unsigned char, unsigne
         else if(p == 'K'){
             for(unsigned char scanpos = i - 16; scanpos > A9; scanpos -= 16){
                 if(_state_pointer[scanpos] == 'k'){
-                    short score_tmp = 0;
-                    if(needscore){
-                        score_tmp = _score_func(this, _state_pointer, i, scanpos);
-                    }
-                    legal_moves[num_of_legal_moves] = std::make_tuple(score_tmp, i, scanpos);
-                    if(killer && killer -> first == i && killer -> second == scanpos && needscore){
-                        killer_score = score_tmp;
-                        killer_is_alive = true;
-                    }
+                    legal_moves[num_of_legal_moves] = MAKETUPLE(0, i, scanpos);
                     ++num_of_legal_moves;
-                    mate = true;
                     mate_src = i, mate_dst = scanpos;
-                    if(return_after_mate){ return true; }
+                    return true;
                 } else if(_state_pointer[scanpos] != '.'){
                     break;
                 }
@@ -552,21 +523,12 @@ bool board::AIBoard4::GenMovesWithScore(std::tuple<short, unsigned char, unsigne
                 else if((p == 'B' || p == 'F') && _state_pointer[i + d/2] != '.') {
                     break;
                 }
-                short score_tmp = 0;
-                if(needscore){
-                    score_tmp = _score_func(this, _state_pointer, i, j);
-                }
-                legal_moves[num_of_legal_moves] = std::make_tuple(score_tmp, i, j);
-                if(killer && killer -> first == i && killer -> second == j && needscore){
-                    killer_score = score_tmp;
-                    killer_is_alive = true;
-                }
-                if(q == 'k'){
-                    mate = true;
-                    mate_src = i, mate_dst = j;
-                    if(return_after_mate){ return true; }
-                }
+                legal_moves[num_of_legal_moves] = MAKETUPLE(0, i, j);
                 ++num_of_legal_moves;
+                if(q == 'k'){
+                    mate_src = i, mate_dst = j;
+                    return true;
+                }
                 if((p != 'D' && p != 'R') || islower(q)){
                     break;
                 }
@@ -574,9 +536,22 @@ bool board::AIBoard4::GenMovesWithScore(std::tuple<short, unsigned char, unsigne
         } //dir
     } //for
     if(needscore){
-        std::sort(legal_moves, legal_moves + num_of_legal_moves, GreaterTuple<short, unsigned char, unsigned char>);
+        for(int i = 0; i < num_of_legal_moves; ++i){
+            unsigned char src = SRC(legal_moves[i]), dst = DST(legal_moves[i]);
+            legal_moves[i].score = _score_func(this, _state_pointer, src, dst);
+            if(killer && src == killer -> first && dst == killer -> second){
+                killer_is_alive = true;
+                killer_score = legal_moves[i].score;
+            }
+        }
+        std::sort(legal_moves, legal_moves + num_of_legal_moves, [](const scoretuple& i, const scoretuple& j) -> bool {
+            if(SCORE(i) > SCORE(j)) return true;
+            if(SCORE(i) == SCORE(j) && SRC(i) > SRC(j)) return true;
+            if(SCORE(i) == SCORE(j) && SRC(i) == SRC(j) && DST(i) > DST(j)) return true; 
+            return false;
+        });
     }
-    return mate;
+    return false;
 }//GenMovesWithScore()
 
 
@@ -584,30 +559,28 @@ template<bool doublereverse>
 bool board::AIBoard4::Mate(){
     if(doublereverse)
         turn = !turn;
-    std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[MAX_POSSIBLE_MOVES];
+    scoretuple legal_moves_tmp[MAX_POSSIBLE_MOVES];
     int num_of_legal_moves_tmp = 0;
     short killer_score = 0;
     unsigned char mate_src = 0, mate_dst = 0;
     bool killer_is_alive = false;
-    bool mate = GenMovesWithScore<false, true>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, killer_score, mate_src, mate_dst, killer_is_alive);
+    bool mate = GenMovesWithScore<false>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, killer_score, mate_src, mate_dst, killer_is_alive);
     if(doublereverse)
         turn = !turn;
     return mate;
 }
 
-bool board::AIBoard4::Executed(bool* oppo_mate, std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[], int num_of_legal_moves_tmp, bool calc){
+bool board::AIBoard4::Executed(bool* oppo_mate, scoretuple legal_moves_tmp[], int num_of_legal_moves_tmp){
     //判断是否被对方将死
     //注意, 这个函数应该在mate_by_oppo为true的时候调用。如mate_by_oppo==false, 根本没将军, 调用没意义
-    if(calc){
-        *oppo_mate = Mate<true>();
-    }
+    *oppo_mate = Mate<true>();
     if(!*oppo_mate){
         return false;
     }
     bool saved = false; //还有救?
     for(int i = 0; i < num_of_legal_moves_tmp; ++i){
-        auto tuple = legal_moves_tmp[i];
-        Move(std::get<1>(tuple), std::get<2>(tuple), std::get<0>(tuple));
+        scoretuple tuple = legal_moves_tmp[i];
+        Move(SRC(tuple), DST(tuple), SCORE(tuple));
         if(!Mate<false>()){
             saved = true;
         }
@@ -619,13 +592,15 @@ bool board::AIBoard4::Executed(bool* oppo_mate, std::tuple<short, unsigned char,
 
 #if DEBUG
 bool board::AIBoard4::ExecutedDebugger(bool *oppo_mate){
-    std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[MAX_POSSIBLE_MOVES];
+    scoretuple legal_moves_tmp[MAX_POSSIBLE_MOVES];
     int num_of_legal_moves_tmp = 0;
     short killer_score = 0;
     unsigned char mate_src = 0, mate_dst = 0;
     bool killer_is_alive = false;
-    GenMovesWithScore<false, false>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, killer_score, mate_src, mate_dst, killer_is_alive);
-    return Executed(oppo_mate, legal_moves_tmp, num_of_legal_moves_tmp, true);
+    if(GenMovesWithScore<false>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, killer_score, mate_src, mate_dst, killer_is_alive)){
+        return false;
+    }
+    return Executed(oppo_mate, legal_moves_tmp, num_of_legal_moves_tmp);
 }
 #endif
 
@@ -639,18 +614,18 @@ bool board::AIBoard4::Ismate_After_Move(unsigned char src, unsigned char dst){
     //a8a7后不形成将军return false
     short score = 0;
     unsigned char mate_src, mate_dst;
-    std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[MAX_POSSIBLE_MOVES];
+    scoretuple legal_moves_tmp[MAX_POSSIBLE_MOVES];
     int num_of_legal_moves_tmp = 0;
     bool killer_is_alive = false;
     Move(src, dst, 0);
     turn = !turn;
-    bool mate = GenMovesWithScore<false, true>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, score, mate_src, mate_dst, killer_is_alive);
+    bool mate = GenMovesWithScore<false>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, score, mate_src, mate_dst, killer_is_alive);
     turn = !turn;
     UndoMove(1);
     return mate;
 }
 
-void board::AIBoard4::CalcVersion(const int ver, const float discount_factor){
+void board::AIBoard4::CalcVersion(const int ver){
     short numr = 0, numb = 0; 
     numr += aidi[ver][1][INTR]; numr += aidi[ver][1][INTN];  numr += aidi[ver][1][INTB];  numr += aidi[ver][1][INTA];  numr += aidi[ver][1][INTC]; numr += aidi[ver][1][INTP]; 
     numb += aidi[ver][0][INTr]; numb += aidi[ver][0][INTn];  numb += aidi[ver][0][INTb];  numb += aidi[ver][0][INTa];  numb += aidi[ver][0][INTc]; numb += aidi[ver][0][INTp]; 
@@ -658,7 +633,6 @@ void board::AIBoard4::CalcVersion(const int ver, const float discount_factor){
     if(numr > 0){
         double sumr = 0.0;
         for(const char c : MINGZI){
-            //for c == 'K', aidi[ver][1][(int)c] = 0
             sumr += pst[(int)c][0] * aidi[ver][1][(int)c] / discount_factor;
         }
         aiaverage[ver][1][0][0] = ::round(sumr / numr);
@@ -689,75 +663,39 @@ void board::AIBoard4::CalcVersion(const int ver, const float discount_factor){
 void board::AIBoard4::CopyData(const unsigned char di[2][123]){
     memset(aiaverage, 0, sizeof(aiaverage));
     memset(aisumall, 0, sizeof(aisumall));
-    memset(aidi, 0, sizeof(aidi));
-    for(int i = 0; i < VERSION_MAX; ++i){
-        memcpy(aidi[i], di, sizeof(aidi[i]));
-    }
-    CalcVersion(0, discount_factor);
+    memcpy(aidi[0], di, sizeof(aidi[0]));
+    CalcVersion(0);
 }
 
-bool board::AIBoard4::Think(int* src, int* dst){
-    constexpr short MATE_UPPER = 2600;
-    constexpr short EVAL_ROBUSTNESS = 15;
-    bool execute = false;
-    bool traverse_all_strategy = true;
-    int max_depth = (round < 15?6:7);
-    int quiesc_depth = (round < 15?1:0);
+bool board::AIBoard4::Think(int maxdepth, unsigned char& src, unsigned char& dst, py::dict* valdict){
     int depth = 0;
-    auto start = std::chrono::high_resolution_clock::now();
-    for(depth = 6; depth <= max_depth; ++depth){
-        short lower = -MATE_UPPER, upper = MATE_UPPER;
-        int me = 0, op = 0;
-        while(lower < upper - EVAL_ROBUSTNESS){
-            short gamma = (lower + upper + 1)/2; //不会溢出
-            short score = mtd_alphabeta4(this, gamma, depth + quiesc_depth, true, true, true, quiesc_depth, traverse_all_strategy, &me, &op);
-            if(me <= depth + quiesc_depth + 2 || op <= depth + quiesc_depth + 2){
-                execute = true;
-                break;
+    for(depth = 1; depth <= maxdepth; ++depth){
+        moves.clear();
+        short score = alphabeta4(this, -MATE_UPPER, MATE_UPPER, depth, ROOT, true, true, src, dst, valdict);
+        if(score > BAN_VALUE || depth == maxdepth){
+            if(depth <= 6){
+                calleval4(this, -MATE_UPPER, MATE_UPPER, {2, 4}, true, src, dst);
             }
-            if(score >= gamma) { lower = score; }
-            if(score < gamma) { upper = score; }
-        }
-        if(!execute){
-            mtd_alphabeta4(this, lower, depth + quiesc_depth, true, true, true, quiesc_depth, traverse_all_strategy, &me, &op);
-            if(me <= depth + quiesc_depth + 2 || op <= depth + quiesc_depth + 2){
-                execute = true;
-            }
-        }
-        size_t int_ms = (size_t)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - start).count();
-        if(execute || int_ms > 50000 || depth == max_depth){
-            Scan();
-            if(me <= 6 && (covered > 0 || covered_opponent > 0)){
-                short lower = -MATE_UPPER, upper = MATE_UPPER;
-                while(lower < upper - EVAL_ROBUSTNESS){
-                    short gamma = (lower + upper + 1)/2; //不会溢出
-                    short score = calleval4(this, gamma, {2, 3}, {true, false}, true, false);
-                    if(score >= gamma) { lower = score; }
-                    if(score < gamma) { upper = score; }
-                }
-                calleval4(this, lower, {2, 3}, {true, false}, true, false);
-            }
-            auto move = (*tp_move)[{zobrist_hash, turn}];
+            std::pair<unsigned char, unsigned char> move = {src, dst};
             if(move == std::pair<unsigned char, unsigned char>({0, 0})){
                 unsigned char mate_src = 0, mate_dst = 0;
-                std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[MAX_POSSIBLE_MOVES];
+                scoretuple legal_moves_tmp[MAX_POSSIBLE_MOVES];
                 int num_of_legal_moves_tmp = 0;
                 bool killer_is_alive = false;
                 short killer_score = 0;
-                GenMovesWithScore<true, false>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, killer_score, mate_src, mate_dst, killer_is_alive);
+                GenMovesWithScore<true>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, killer_score, mate_src, mate_dst, killer_is_alive);
+                src = SRC(legal_moves_tmp[0]);
+                dst = DST(legal_moves_tmp[0]);
                 if(num_of_legal_moves_tmp != 0){
-                    *src = std::get<1>(legal_moves_tmp[0]);
-                    *dst = std::get<2>(legal_moves_tmp[0]);
                     return false;
                 }
             }
-            *src = move.first;
-            *dst = move.second;
             return true;
         }
     }
     return false;
 }
+
 
 void board::AIBoard4::PrintPos(bool turn) const{
     printf("version = %d, turn = %d, this -> turn = %d, round = %d\n", version, turn, this -> turn, round);
@@ -777,8 +715,9 @@ void board::AIBoard4::PrintPos(bool turn) const{
     std::cout << "  ａｂｃｄｅｆｇｈｉ\n\n";
 }
 
-std::string board::AIBoard4::DebugPrintPos(bool turn) const{
+std::string board::AIBoard4::DebugPrintPos() const{
     std::string ret;
+    ret += "che=" + std::to_string(che) + ", che_opponent=" + std::to_string(che_opponent) + ", zu=" + std::to_string(zu) + ", zu_opponent=" + std::to_string(zu_opponent) + "\n";
     if(turn){
         ret += "RED\n";   
     }else{
@@ -818,10 +757,10 @@ void board::AIBoard4::print_raw_board(const char* board, const char* hint, Args.
     print_raw_board(args...);
 }
 
-inline short complicated_score_function4(board::AIBoard4* bp, const char* state_pointer, unsigned char src, unsigned char dst){
+inline short complicated_score_function4(board::AIBoard4* self, const char* state_pointer, unsigned char src, unsigned char dst){
     #define LOWER_BOUND -32768
     #define UPPER_BOUND 32767
-    constexpr short MATE_UPPER = 2600;
+    board::AIBoard4* bp = reinterpret_cast<board::AIBoard4*>(self);
     int version = bp -> version;
     int turn = bp -> turn ? 1 : 0;
     int che_char = bp -> turn ? (int)'R': (int)'r';
@@ -847,19 +786,6 @@ inline short complicated_score_function4(board::AIBoard4* bp, const char* state_
     }
     if(p == 'R' || p == 'N' || p == 'B' || p == 'A' || p == 'K' || p == 'C' || p == 'P'){
         score =  bp -> pst[intp][dst] -  bp -> pst[intp][src];
-        
-        if(p == 'R'){
-            if(state_pointer[51] != 'd' && state_pointer[51] != 'r' && state_pointer[54] != 'a' && state_pointer[71] != 'a' && (state_pointer[71] == 'p' || state_pointer[87] != 'n')){
-                if( (dst & 15) == 6 && (src & 15) != 6 ) { score += 30; }
-                else if((src & 15) == 6 && (dst & 15) != 6) { score -= 30; }
-            }
-            
-            if(state_pointer[59] != 'd' && state_pointer[59] != 'r' && state_pointer[56] != 'a' && state_pointer[71] != 'a' && (state_pointer[71] == 'p' || state_pointer[87] != 'n')){
-                if( (dst & 15) == 8 && (src & 15) != 8 ) { score += 30; }
-                else if((src & 15) == 8 && (dst & 15) != 8) { score -= 30; }
-            }
-            
-        }//else if( p == 'R')
     }
     
     else{
@@ -867,11 +793,7 @@ inline short complicated_score_function4(board::AIBoard4* bp, const char* state_
         float che_zu_possibility = bp -> aisumall[version][turn] > 0 ? (bp -> aidi[version][turn][che_char] + bp -> aidi[version][turn][zu_char])/bp -> aisumall[version][turn] : 0.0;
         float scorediff = bp -> aiaverage[version][turn][0][0] * che_zu_possibility;
         if(p == 'D'){
-            if(bp -> score_rough < -150){
-                score -= (45 * (possible_che_opponent/2 + bp -> che_opponent - (q == 'R')));
-            }else{
-                score -= (30 * (possible_che_opponent/2 + bp -> che_opponent - (q == 'R')));
-            }
+            score -= (30 * (possible_che_opponent/2 + bp -> che_opponent - (q == 'R')));
         }else if(p == 'E'){
             auto judge_left = [&state_pointer]() -> bool {
                 return state_pointer[147] == 'r' || state_pointer[148] == 'r';
@@ -978,9 +900,7 @@ inline short complicated_score_function4(board::AIBoard4* bp, const char* state_
 
             if((src == 164 && dst == 52 && state_pointer[52] == 'e' && (state_pointer[51] == 'd' || state_pointer[51] == 'r')) || \
                     (src == 170 && dst == 58 && state_pointer[58] == 'e' && (state_pointer[59] == 'd' || state_pointer[59] == 'r'))){
-                        if((src == 164 && state_pointer[148] == 'p') || (src == 170 && state_pointer[154] == 'p')) {;}
-                        if((bp -> che) < (bp -> che_opponent) || bp -> che == 0 || (bp -> score_rough < 150)) {score -= 150; }
-                        //else if(che == che_opponent): Python BUG
+                        if((bp -> che) < (bp -> che_opponent) || bp -> che == 0) {score -= 150; }
                     }
          
         }else if(p == 'I' && state_pointer[src - 32] != 'r' && state_pointer[src - 32] != 'p'){
@@ -996,20 +916,16 @@ inline short complicated_score_function4(board::AIBoard4* bp, const char* state_
     if(q >= 'A' && q <= 'Z'){
         int k = 254 - dst;
         if(q == 'R' || q == 'N' || q == 'B' || q == 'A' || q == 'C' || q == 'P'){
-            score += bp -> pst[intq][k];
+            score +=  bp -> pst[intq][k];
         }
         else{
             if(q != 'U'){
-                score += bp -> aiaverage[version][1 - turn][0][0];              
+                score += bp -> aiaverage[version][1 - turn][0][0];            
             }else{
                 score += bp -> aiaverage[version][1 - turn][1][k];
             }
             if(q == 'D'){
-                if(bp -> score_rough > 150){
-                    score +=  45 * (possible_che/2 + bp -> che);
-                }else{
-                    score +=  30 * (possible_che/2 + bp -> che);
-                }                   
+                score +=  30 * (possible_che/2 + bp -> che);               
             }//if(q == 'D')
         }           
     }//capture
@@ -1065,390 +981,225 @@ std::string SearchScoreFunction4(void* score_func, int type){
     return "";
 }
 
-
-short mtd_quiescence4(board::AIBoard4* self, const short gamma, int quiesc_depth, const bool root, int* me, int* op){
-    constexpr short MATE_UPPER = 2600;
-    constexpr int TOPK = 3;
-    unsigned char mate_src = 0, mate_dst = 0;
-    *me = std::numeric_limits<int>::max()/2;
-    *op = std::numeric_limits<int>::min()/2;
-    std::function<short()> evaluate = [self]() -> short{
-        return self -> score + self -> kongtoupao_score - self -> kongtoupao_score_opponent + self -> ScanProtectors();
-    };
-    std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[MAX_POSSIBLE_MOVES];
-    int num_of_legal_moves_tmp = 0;
-    const char* _state_pointer = self -> turn? self -> state_red : self -> state_black;
-    bool killer_is_alive = false;
-    short killer_score = 0;
-    bool mate = quiesc_depth ? self -> GenMovesWithScore<true, false>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, killer_score, mate_src, mate_dst, killer_is_alive) : \
-        self -> GenMovesWithScore<false, true>(legal_moves_tmp, num_of_legal_moves_tmp, NULL, killer_score, mate_src, mate_dst, killer_is_alive);
-    std::pair<uint32_t, bool> pairturn = {self -> zobrist_hash, self -> turn};    
-    std::pair<uint32_t, int> pair = {self -> zobrist_hash, (quiesc_depth << 1) + (int)self -> turn};
-    if(mate) {
-        (*self -> tp_move)[pairturn] = {mate_src, mate_dst}; 
-        *me = 1; 
-        *op = std::numeric_limits<int>::max()/2;
-        return MATE_UPPER; 
-    }
-    if(self -> Executed(&mate, legal_moves_tmp, num_of_legal_moves_tmp, true)){
-        *me = std::numeric_limits<int>::max()/2;
-        *op = 2;
-        return -MATE_UPPER;
-    }
-    if(quiesc_depth == 0) { 
-        *op = std::numeric_limits<int>::max()/2;
-        return evaluate();
-    }
-    std::pair<short, short> entry(-MATE_UPPER, MATE_UPPER);
-    if(self -> tp_score -> find(pair) != self -> tp_score -> end()){
-        entry = (*self -> tp_score)[pair];
-    }
-    if(entry.first >= gamma){
-        *op = std::numeric_limits<int>::max()/2;
-        return entry.first;
-    }
-    if(entry.second < gamma){
-        *op = std::numeric_limits<int>::max()/2;
-        return entry.second;
-    }
-    short score = 0, best = -MATE_UPPER; 
-    std::function<bool(short, unsigned char, unsigned char, short*)> judge = [&](short score, unsigned char src, unsigned char dst, short* best){
-        bool update = score > *best;
-        if(update){
-            *best = score;
-        }
-        if(*best >= gamma && update){
-            if(src && dst && root){
-                (*self -> tp_move)[pairturn] = {src, dst};
-            }
-            return true;
-        }
-        return false;
-    };
-    bool into = false;
-    for(int j = 0; j < num_of_legal_moves_tmp; ++j){
-        auto move_score_tuple = legal_moves_tmp[j];
-        unsigned char src = std::get<1>(move_score_tuple), dst = std::get<2>(move_score_tuple);
-        bool mate_oppo = self -> Ismate_After_Move(src, dst);
-        if(j < TOPK || _state_pointer[dst] == 'r' || _state_pointer[dst] == 'n' || _state_pointer[dst] == 'c' || _state_pointer[dst] == 'u' ||  (_state_pointer[dst] >= 'd' && _state_pointer[dst] <= 'i') || mate || mate_oppo){//走这步可以将到对手, 或正在被对手将军
-            into = true;
-            bool retval = self -> Move(src, dst, std::get<0>(move_score_tuple));
-            if(retval){
-                int metmp = 0, optmp = 0;
-                score = -mtd_quiescence4(self, 1 - gamma, quiesc_depth - 1, false, &metmp, &optmp);
-                *me = std::min(*me, optmp + 1);
-                *op = std::max(*op, metmp + 1);
-            }
-            self -> UndoMove(1);
-            if(score == MATE_UPPER){
-                best = MATE_UPPER;
-                (*self -> tp_move)[pairturn] = {src, dst};
-                break;
-            }
-            if(retval && judge(score, src, dst, &best)){
-                break;
-            }
-        }
-    }
-    if(!into) {
-        self -> Scan();
-        return evaluate();
-    }
-    if(best >= gamma){
-        (*self -> tp_score)[pair] = {best, entry.second};
-    }else{
-        (*self -> tp_score)[pair] = {entry.first, best};
-    }
-    if(*op < 0){
-        *op = std::numeric_limits<int>::max()/2;
-    }
-    if(*me < 0){
-        *me = std::numeric_limits<int>::max()/2;
-    }
-    return best;
-}
-
-short mtd_alphabeta4(board::AIBoard4* self, const short gamma, int depth, const bool root, const bool nullmove, const bool nullmove_now, const int quiesc_depth, const bool traverse_all_strategy, int* me, int* op){
-    constexpr short MATE_UPPER = 2600;
-    unsigned char mate_src = 0, mate_dst = 0;
-    *me = std::numeric_limits<int>::max()/2;
-    *op = std::numeric_limits<int>::min()/2;
-    if(root) {
-        self -> Scan();     
+short alphabeta4(board::AIBoard4* self, short alpha, short beta, int depth, int type, const bool nullmove, const bool nullmovenow, unsigned char& argmaxsrc, unsigned char& argmaxdst, py::dict* valdict){
+    if(type == ROOT){
         self -> original_depth = depth;
+        self -> ply = 0;
+        self -> Scan();
     }
-    if(!root && self -> hist -> find(self -> state_red) != self -> hist -> end()){
-        //假设AI执红。校验对象红方(self->original_turn)
-        //红方走了一步, 形成局面A, self -> hist[self -> state_red] == false(因为现在是黑方)
-        //如果和当前局面重复(当前局面为!self -> original_turn), 且turn也相同, 直接判断黑方胜利
-        *me = 0;
-        *op = std::numeric_limits<int>::max()/2;
-        return MATE_UPPER;
-    }
-    std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[MAX_POSSIBLE_MOVES];
-    int num_of_legal_moves_tmp = 0;
-    depth = std::max(depth, quiesc_depth);
-    std::pair<unsigned char, unsigned char> killer = {0, 0};
-    bool killer_is_alive = false;
-    short killer_score = 0;
-    std::pair<uint32_t, bool> pairturn = {self -> zobrist_hash, self -> turn};  
-    std::pair<uint32_t, int> pair = {self -> zobrist_hash, (depth << 1) + (int)self -> turn};
-    if(self -> tp_move -> find(pairturn) != self -> tp_move -> end()){
-        killer = (*self -> tp_move)[pairturn];
-        killer_is_alive = true;
-    }
-    bool mate = (depth == quiesc_depth ? self -> GenMovesWithScore<false, true>(legal_moves_tmp, num_of_legal_moves_tmp, killer_is_alive?&killer:NULL, killer_score, mate_src, mate_dst, killer_is_alive) : \
-        self -> GenMovesWithScore<true, false>(legal_moves_tmp, num_of_legal_moves_tmp, killer_is_alive?&killer:NULL, killer_score, mate_src, mate_dst, killer_is_alive));
-    if(mate) { 
-        (*self -> tp_move)[pairturn] = {mate_src, mate_dst};
-        *me = 1; 
-        *op = std::numeric_limits<int>::max()/2;
-        return MATE_UPPER;
-    }
-    if(self -> Executed(&mate, legal_moves_tmp, num_of_legal_moves_tmp, true)){
-        *me = std::numeric_limits<int>::max()/2;
-        *op = 2;
-        return -MATE_UPPER;
-    }
-    if(depth == quiesc_depth){
-        short score = mtd_quiescence4(self, gamma, quiesc_depth, true, me, op);
-        return score;
-    }
-    std::pair<short, short> entry(-MATE_UPPER, MATE_UPPER);
-    if(self -> tp_score -> find(pair) != self -> tp_score -> end()){
-        entry = (*self -> tp_score)[pair];
-    }
-    if(entry.first >= gamma && (!root || killer_is_alive)){
-        *op = std::numeric_limits<int>::max()/2;
-        return entry.first;
-    }
-    if(entry.second < gamma){
-        *op = std::numeric_limits<int>::max()/2;
-        return entry.second;
-    }
-    short score = 0, best = -MATE_UPPER;
-    std::function<bool(short, unsigned char, unsigned char, short*)> judge = [&](short score, unsigned char src, unsigned char dst, short* best){
-        bool update = score > *best;
-        if(update){
-            *best = score;
-        }
-        if(*best >= gamma && update){
-            if(src && dst){
-                (*self -> tp_move)[pairturn] = {src, dst};
-            }
-            return true;
-        }
-        return false;
-    };
-    do{
-        if(nullmove && nullmove_now && depth > 3 && !mate && !root){
-            self -> NULLMove();
-            int metmp = 0, optmp = 0;  
-            score = -mtd_alphabeta4(self, 1 - gamma, depth - 3, false, nullmove, nullmove, quiesc_depth, traverse_all_strategy, &metmp, &optmp); //Attempt: false --> nullmove
-            *me = std::min(optmp + 1, *me);
-            *op = std::max(metmp + 1, *op);
-            self -> UndoMove(0);
-            if(judge(score, 0, 0, &best) && (!root || !traverse_all_strategy)){
-                break;
-            }
-        }
-
-        if(killer_is_alive){
-            bool retval = self -> Move(killer.first, killer.second, killer_score);
-            int metmp = 0, optmp = 0; 
-            if(retval){ 
-                score = -mtd_alphabeta4(self, 1 - gamma, depth - 1, false, nullmove, nullmove, quiesc_depth, traverse_all_strategy, &metmp, &optmp);
-                *me = std::min(optmp + 1, *me);
-                *op = std::max(metmp + 1, *op);
-            }
-            self -> UndoMove(1);
-            if(score == MATE_UPPER){
-                best = MATE_UPPER;
-                break;
-            }
-            if(retval && judge(score, killer.first, killer.second, &best) && (!root || !traverse_all_strategy)){
-                break;
-            }
-        }
-        for(int j = 0; j < num_of_legal_moves_tmp; ++j){
-            auto move_score_tuple = legal_moves_tmp[j];
-            auto src = std::get<1>(move_score_tuple), dst = std::get<2>(move_score_tuple);
-            if(killer_is_alive && src == killer.first && dst == killer.second){
-                continue;
-            }
-            bool retval = self -> Move(src, dst, std::get<0>(move_score_tuple));
-            int metmp = 0, optmp = 0; 
-            if(retval){
-                score = -mtd_alphabeta4(self, 1 - gamma, depth - 1, false, nullmove, nullmove, quiesc_depth, traverse_all_strategy, &metmp, &optmp);
-                *me = std::min(optmp + 1, *me);
-                *op = std::max(metmp + 1, *op);
-            }
-            self -> UndoMove(1);
-            if(score == MATE_UPPER){
-                best = MATE_UPPER;
-                (*self -> tp_move)[pairturn] = {src, dst};
-                break;
-            }
-            if(retval && judge(score, src, dst, &best) && (!root || !traverse_all_strategy)){
-                break;
-            }
-        }
-    }while(false);
-    if(best >= gamma){
-        (*self -> tp_score)[pair] = {best, entry.second};
-    }else{
-        (*self -> tp_score)[pair] = {entry.first, best};
-    }
-    if(*op < 0){
-        *op = std::numeric_limits<int>::max()/2;
-    }
-    if(*me < 0){
-        *me = std::numeric_limits<int>::max()/2;
-    }
-    return best;
-}
-
-
-short mtd_alphabeta_doublerecursive4(board::AIBoard4* self, const int ver, const short gamma, std::vector<int>& depths, std::vector<bool>& traverse_all_strategies, const bool root, const bool nullmove, \
-    const bool nullmove_now, const bool pruning, const float discount_factor, std::unordered_map<unsigned char, char>& uncertainty_dict, bool* need_clamp){
-    constexpr short MATE_UPPER = 2600;
-    *need_clamp = false;
-    auto src_move_is_from_uncertainty_dict = [&](unsigned char i){
-        for(auto j = uncertainty_dict.begin(); j != uncertainty_dict.end(); ++j){
-            if(j -> first == i && self -> turn == self -> original_turns[ver]){
-                return true;
-            }
-            if(j -> first == 254 - i && self -> turn != self -> original_turns[ver]){
-                return true;
-            }
-        }
-        return false;
-    };
-
-    self -> version = ver;
-    int depth = depths[ver];
-    bool traverse_all_strategy = traverse_all_strategies[ver];
-    unsigned char mate_src = 0, mate_dst = 0;
-    if(root) {
-        self -> Scan();  
-    }
-    if(!root && self -> hist -> find(self -> state_red) != self -> hist -> end()){
-        //假设AI执红。校验对象红方(self->original_turn)
-        //红方走了一步, 形成局面A, self -> hist[self -> state_red] == false(因为现在是黑方)
-        //如果和当前局面重复(当前局面为!self -> original_turn), 且turn也相同, 直接判断黑方胜利
-        return MATE_UPPER;
-    }
-    std::tuple<short, unsigned char, unsigned char> legal_moves_tmp[MAX_POSSIBLE_MOVES];
-    int num_of_legal_moves_tmp = 0;
     depth = std::max(depth, 0);
+    scoretuple legal_moves_tmp[MAX_POSSIBLE_MOVES];
     std::pair<unsigned char, unsigned char> killer = {0, 0};
+    unsigned char mate_src = 0, mate_dst = 0, killer_src = 0, killer_dst = 0;
     bool killer_is_alive = false;
-    short killer_score = 0;
-    if(self -> tp_move -> find({self -> zobrist_hash, self -> turn}) != self -> tp_move -> end()){
-        killer = (*self -> tp_move)[{self -> zobrist_hash, self -> turn}];
+    tp* hashnode = NULL;
+    short val = 0, hashval = self -> ProbeHash(depth, alpha, beta, !(nullmove && nullmovenow && type == CUT), &hashnode), killer_score = 0;
+    if(hashnode){
         killer_is_alive = true;
+        killer_src = hashnode -> src;
+        killer_dst = hashnode -> dst;
     }
-    bool mate = (depth ? self -> GenMovesWithScore<true, false>(legal_moves_tmp, num_of_legal_moves_tmp, killer_is_alive?&killer:NULL, killer_score, mate_src, mate_dst, killer_is_alive) : \
-        self -> GenMovesWithScore<false, true>(legal_moves_tmp, num_of_legal_moves_tmp, killer_is_alive?&killer:NULL, killer_score, mate_src, mate_dst, killer_is_alive));
-    if(mate) { 
-        *need_clamp = src_move_is_from_uncertainty_dict(mate_src);
-        (*self -> tp_move)[{self -> zobrist_hash, self -> turn}] = {mate_src, mate_dst}; 
-        return MATE_UPPER; 
+    if(killer_is_alive){
+        killer = {killer_src, killer_dst};
     }
-    if((size_t)ver == depths.size() - 1 && self -> Executed(&mate, legal_moves_tmp, num_of_legal_moves_tmp, true)){
-        return -MATE_UPPER;
+    int num_of_legal_moves_tmp = 0;
+    bool mate = (depth ? self -> GenMovesWithScore<true>(legal_moves_tmp, num_of_legal_moves_tmp, killer_is_alive?&killer:NULL, killer_score, mate_src, mate_dst, killer_is_alive) : \
+            self -> GenMovesWithScore<false>(legal_moves_tmp, num_of_legal_moves_tmp, killer_is_alive?&killer:NULL, killer_score, mate_src, mate_dst, killer_is_alive));
+    if(mate){
+        short tmp = MATE_UPPER - 1 - self -> ply;
+        self -> RecordHash(depth, tmp, tmp, hashfEXACT, mate_src, mate_dst, 1);
+        argmaxsrc = mate_src, argmaxdst = mate_dst;
+        self -> moves[{self -> zobrist_hash, MAKE}] = {self->translate_ucci(argmaxsrc, argmaxdst), tmp, tmp, alpha, beta, 1, -1, depth, type};
+        return tmp;
+    }
+    if(self -> Executed(&mate, legal_moves_tmp, num_of_legal_moves_tmp)){
+        short tmp = 2 + self -> ply - MATE_UPPER;
+        self -> RecordHash(depth, tmp, tmp, hashfEXACT, 0, 0, 2);
+        argmaxsrc = 0; argmaxdst = 0;
+        self -> moves[{self -> zobrist_hash, MAKE}] = {self->translate_ucci(argmaxsrc, argmaxdst), tmp, tmp, alpha, beta, 2, -1, depth, type};
+        return tmp;
+    }
+    if(killer_is_alive && hashnode && hashval != -MATE_UPPER){
+        argmaxsrc = hashnode -> src;
+        argmaxdst = hashnode -> dst;
+        bool retval = false;
+        //try move
+        if(!mate){
+            retval = self -> Move(argmaxsrc, argmaxdst, 0);
+            self -> UndoMove(1);
+        }
+        //try move ends
+        if(mate || retval){
+            self -> moves[{self -> zobrist_hash, MAKE}] = {self->translate_ucci(argmaxsrc, argmaxdst), hashval, hashnode -> score, alpha, beta, 0, hashnode -> recordplace, depth, type};
+            return hashval;
+        }
     }
     if(depth == 0){
-        return eval4(self, ver+1, gamma, depths, traverse_all_strategies, nullmove, nullmove_now, pruning, discount_factor);
+        short val = self -> evaluate();
+        self -> RecordHash(depth, val, 0, hashfEXACT, 0, 0, 3);
+        self -> moves[{self -> zobrist_hash, MAKE}] = {"^<^<", val, 0, alpha, beta, 3, -1, depth, type};
+        return val;
     }
-    std::pair<short, short> entry(-MATE_UPPER, MATE_UPPER);
-    std::pair<uint32_t, int> pair = {self -> zobrist_hash, (depth << 1) + (int)self -> turn};
-    if(self -> tp_score -> find(pair) != self -> tp_score -> end()){
-        entry = (*self -> tp_score)[pair];
-    }
-    if(entry.first >= gamma && (!root || killer_is_alive)){
-        return entry.first;
-    }
-    if(entry.second < gamma){
-        return entry.second;
-    }
-    short score = 0, best = -MATE_UPPER;
-    std::function<bool(short, unsigned char, unsigned char, short*)> judge = [&](short score, unsigned char src, unsigned char dst, short* best){
-        bool update = score > *best;
-        if(update){
-            *best = score;
-        }
-        if(*best >= gamma && update){
-            if(src && dst){
-                (*self -> tp_move)[{self -> zobrist_hash, self -> turn}] = {src, dst};
-                *need_clamp =  src_move_is_from_uncertainty_dict(src);
-            }
-            return true;
-        }
-        return false;
-    };
+    int hashf = hashfALPHA;
+    short best = -MATE_UPPER;
+    argmaxsrc = 0, argmaxdst = 0;
+    std::unordered_map<std::string, short> ucci2val;
     do{
-        if(nullmove && nullmove_now && depth > 3 && !mate && !root){
-            depths[ver] -= 3;
-            self -> NULLMove();
-            score = -mtd_alphabeta_doublerecursive4(self, ver, 1 - gamma, depths, traverse_all_strategies, false, nullmove, nullmove, pruning, discount_factor, uncertainty_dict, need_clamp); //Attempt: false --> nullmove
+        std::string ucci, bestucci;
+        if(type == CUT && !mate && nullmove && nullmovenow){
+            unsigned char t1 = 0, t2 = 0;
+            ucci = "^<^<";
+            bool retval = self -> NULLMove();
+            val = -alphabeta4(self, -beta, 1-beta, depth - 3, type, nullmove, false, t1, t2, NULL);
+            ucci2val[ucci] = val;
             self -> UndoMove(0);
-            depths[ver] += 3;
-            if(judge(score, 0, 0, &best) && (!root || !traverse_all_strategy)){
-                break;
+            if(retval && val >= beta){
+                self -> RecordHash(std::max(depth, 3), val, 0, hashfBETA, 0, 0, 4);
+                self -> moves[{self -> zobrist_hash, MAKE}] = debugtuple{ucci, val, 0, alpha, beta, 4, -1, depth, type};
+                return val;
             }
         }
         if(killer_is_alive){
-            bool retval = self -> Move(killer.first, killer.second, killer_score);
-            if(retval){
-                depths[ver] -= 1;
-                score = -mtd_alphabeta_doublerecursive4(self, ver, 1 - gamma, depths, traverse_all_strategies, false, nullmove, nullmove, pruning, discount_factor, uncertainty_dict, need_clamp);
-                depths[ver] += 1;
-            }
+            ucci = self -> translate_ucci(killer_src, killer_dst);
+            BANNED
+            bool retval = self -> Move(killer_src, killer_dst, killer_score) || mate;
+            SEARCHBODY
             self -> UndoMove(1);
-            if(retval && judge(score, killer.first, killer.second, &best) && (!root || !traverse_all_strategy)){
-                break;
+            DECISION(killer_src, killer_dst, true, killer_score);
+            if(type == ROOT && valdict){
+                (*valdict)[py::str(ucci)] = killer_score;
             }
         }
-
-        for(int j = 0; j < num_of_legal_moves_tmp; ++j){
-            auto move_score_tuple = legal_moves_tmp[j];
-            auto src = std::get<1>(move_score_tuple), dst = std::get<2>(move_score_tuple);
-            bool retval = self -> Move(src, dst, std::get<0>(move_score_tuple));
-            if(retval){
-                depths[ver] -= 1;
-                score = -mtd_alphabeta_doublerecursive4(self, ver, 1 - gamma, depths, traverse_all_strategies, false, nullmove, nullmove, pruning, discount_factor, uncertainty_dict, need_clamp);
-                depths[ver] += 1;
+        for(int i = 0; i < num_of_legal_moves_tmp; ++i){
+            auto tuple = legal_moves_tmp[i];
+            short score = SCORE(tuple);
+            unsigned char src = SRC(tuple), dst = DST(tuple);
+            if(killer_is_alive && src == killer_src && dst == killer_dst){
+                continue;
             }
+            ucci = self -> translate_ucci(src, dst);
+            BANNED
+            bool retval = self -> Move(src, dst, score) || mate;
+            SEARCHBODY
             self -> UndoMove(1);
-            if(retval && judge(score, src, dst, &best) && (!root || !traverse_all_strategy)){
-                break;
+            DECISION(src, dst, false, score);
+            if(type == ROOT && valdict){
+                (*valdict)[py::str(ucci)] = killer_score;
             }
         }
     }while(false);
-    if(best >= gamma){
-        (*self -> tp_score)[pair] = {best, entry.second};
-    }else{
-        (*self -> tp_score)[pair] = {entry.first, best};
+    for(auto it = ucci2val.begin(); it != ucci2val.end(); ++it){
+        if(best > -WIN_VALUE && it -> second < -WIN_VALUE){
+            self -> banned[SELFMASK].insert(it -> first);
+        }
     }
+    if(best == -MATE_UPPER){
+        best = self -> ply - MATE_UPPER;
+        argmaxsrc = argmaxdst = 0;
+        self -> moves[{self -> zobrist_hash, MAKE}] = debugtuple{"^<^<", best, best, alpha, beta, 7, -1, depth, type};
+    }
+    self -> RecordHash(depth, best, self -> moves[{self -> zobrist_hash, MAKE}].score, hashf, argmaxsrc, argmaxdst, 7);
+    return best;
+}
+
+
+short alphabeta_doublerecursive4(board::AIBoard4* self, const int ver, short alpha, short beta, std::vector<int>& depths, const int type, const bool nullmove, const bool nullmovenow, std::unordered_map<unsigned char, char>& uncertainty_dict, bool* needclamp, unsigned char& argmaxsrc, unsigned char& argmaxdst){
+    int depth = std::max(depths[ver], 0);
+    self -> Scan();
+    if(type == ROOT){
+        self -> original_depth = depth;
+        self -> ply = self -> score = 0;
+    }
+    scoretuple legal_moves_tmp[MAX_POSSIBLE_MOVES];
+    std::pair<unsigned char, unsigned char> killer = {0, 0};
+    unsigned char mate_src = 0, mate_dst = 0, killer_src = 0, killer_dst = 0;
+    bool killer_is_alive = false;
+    tp* hashnode = NULL;
+    short val = 0, hashval = self -> ProbeHash(depth, alpha, beta, !(nullmove && nullmovenow && type == CUT), &hashnode), killer_score = 0;
+    if(hashnode){
+        killer_is_alive = true;
+        killer_src = hashnode -> src;
+        killer_dst = hashnode -> dst;
+    }
+    if(killer_is_alive){
+        killer = {killer_src, killer_dst};
+    }
+    int num_of_legal_moves_tmp = 0;
+    bool mate = (depth ? self -> GenMovesWithScore<true>(legal_moves_tmp, num_of_legal_moves_tmp, killer_is_alive?&killer:NULL, killer_score, mate_src, mate_dst, killer_is_alive) : \
+            self -> GenMovesWithScore<false>(legal_moves_tmp, num_of_legal_moves_tmp, killer_is_alive?&killer:NULL, killer_score, mate_src, mate_dst, killer_is_alive));
+    if(mate){
+        short tmp = MATE_UPPER - 1 - self -> ply;
+        self -> RecordHash(depth, tmp, tmp, hashfEXACT, mate_src, mate_dst, 1);
+        argmaxsrc = mate_src, argmaxdst = mate_dst;
+        return tmp;
+    }
+    mate = self -> Mate<true>();
+    if(killer_is_alive && hashnode && hashval != -MATE_UPPER){
+        argmaxsrc = hashnode -> src;
+        argmaxdst = hashnode -> dst;
+        bool retval = false;
+        if(!mate){
+            retval = self -> Move(argmaxsrc, argmaxdst, 0);
+            self -> UndoMove(1);
+        }
+        if(mate || retval){
+            return hashval;
+        }
+    }
+    if(depth == 0){
+        unsigned char t1 = 0, t2 = 0;
+        short val = eval4(self, ver+1, alpha, beta, depths, nullmove, t1, t2);
+        self -> RecordHash(depth, val, 0, hashfEXACT, 0, 0, 3);
+        self -> moves[{self -> zobrist_hash, MAKE}] = {"^<^<", val, 0, alpha, beta, 3, -1, depth, type};
+        return val;
+    }
+    int hashf = hashfALPHA;
+    short best = -MATE_UPPER;
+    argmaxsrc = 0, argmaxdst = 0;
+    do{
+        if(killer_is_alive){
+            bool retval = self -> Move(killer_src, killer_dst, killer_score) || mate;
+            SEARCHBODYWO
+            self -> UndoMove(1);
+            DECISIONWO(killer_src, killer_dst, true, killer_score);
+        }
+        for(int i = 0; i < num_of_legal_moves_tmp; ++i){
+            auto tuple = legal_moves_tmp[i];
+            short score = SCORE(tuple);
+            unsigned char src = SRC(tuple), dst = DST(tuple);
+            if(killer_is_alive && src == killer_src && dst == killer_dst){
+                continue;
+            }
+            bool retval = self -> Move(src, dst, score) || mate;
+            SEARCHBODYWO
+            self -> UndoMove(1);
+            DECISIONWO(src, dst, false, score);
+        }
+    }while(false);
+    if(best == -MATE_UPPER){
+        best = self -> ply - MATE_UPPER;
+        argmaxsrc = argmaxdst = 0;
+    }
+    self -> RecordHash(depth, best, self -> moves[{self -> zobrist_hash, MAKE}].score, hashf, argmaxsrc, argmaxdst, 7);
     return best;
 }
 
 void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsigned char, char>& uncertainty_dict, std::vector<unsigned char>& uncertainty_keys, \
-    std::unordered_map<std::pair<int, int>, short, myhash<int, int>>& result_dict, std::unordered_map<std::pair<int, int>, short, myhash<int, int>>& counter_dict, const int index, const int me, const int op, const bool pruning, const short score, const short gamma, \
-    std::vector<int>& depths, std::vector<bool>& traverse_all_strategies, const bool nullmove, const bool nullmove_now, const float discount_factor){
+    std::unordered_map<std::pair<int, int>, short, myhash<int, int>>& result_dict, std::unordered_map<std::pair<int, int>, short, myhash<int, int>>& counter_dict, \
+    const int index, const int me, const int op, const short score, const short alpha, const short beta, \
+    std::vector<int>& depths, const bool nullmove, unsigned char& argmaxsrc, unsigned char& argmaxdst){
     const int THRES = 300;
-    bool need_clamp = false;
+    bool needclamp = false;
     if(index == 0 && uncertainty_keys.empty()){
-        result_dict[{1, 1}] += mtd_alphabeta_doublerecursive4(self, ver, gamma, depths, traverse_all_strategies, true, nullmove, nullmove_now, pruning, discount_factor, uncertainty_dict, &need_clamp);
+        result_dict[{1, 1}] += alphabeta_doublerecursive4(self, ver, alpha, beta, depths, ROOT, nullmove, nullmove, uncertainty_dict, &needclamp, argmaxsrc, argmaxdst);
         counter_dict[{1, 1}] += 1;
         return;
     }
     if((size_t)index >= uncertainty_keys.size()){
         self -> score = score;
-        self -> CalcVersion(ver, discount_factor);
-        short res =  mtd_alphabeta_doublerecursive4(self, ver, gamma, depths, traverse_all_strategies, true, nullmove, nullmove_now, pruning, discount_factor, uncertainty_dict, &need_clamp);
-        result_dict[{me, op}] += ((need_clamp && res >= THRES) ? THRES : res);
+        self -> CalcVersion(ver);
+        short res =  alphabeta_doublerecursive4(self, ver, alpha, beta, depths, ROOT, nullmove, nullmove, uncertainty_dict, &needclamp, argmaxsrc, argmaxdst);
+        result_dict[{me, op}] += ((needclamp && res >= THRES) ? THRES : res);
         counter_dict[{me, op}] += 1;
     }else{
         bool turn = self -> turn, notturn = !self -> turn;
@@ -1458,7 +1209,7 @@ void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsig
         char c = uncertainty_dict[key];
         switch(c){
             case 'U': {
-                for(char c : self -> MINGZI){
+                for(char c : MINGZI){
                     int intchar = turn ? (int)c : ((int)c) ^ 32;
                     if(self -> aidi[ver][turn][intchar] > 0){
                         --self -> aidi[ver][turn][intchar];
@@ -1469,8 +1220,8 @@ void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsig
                         state_pointer_oppo[254 - key] = self -> swapcase(c);
                         self -> zobrist_hash ^= self -> zobrist[(int)self -> state_red[zobrist_key]][zobrist_key];
                         short score_diff = self -> pst[(int)c][key] - self -> aiaverage[ver-1][turn][1][key];
-                        _inner_recur(self, ver, uncertainty_dict, uncertainty_keys, result_dict, counter_dict, index+1, me*(self -> aidi[ver][turn][intchar] + 1), op, pruning, score + score_diff/2, gamma, depths, \
-                            traverse_all_strategies, nullmove, nullmove_now, discount_factor);
+                        _inner_recur(self, ver, uncertainty_dict, uncertainty_keys, result_dict, counter_dict, index+1, me*(self -> aidi[ver][turn][intchar] + 1), op, score + score_diff/2, alpha, beta, depths, \
+                            nullmove, argmaxsrc, argmaxdst);
                         state_pointer[key] = 'U';
                         state_pointer_oppo[254 - key] = 'u';
                         self -> zobrist_hash = zobrist_before;
@@ -1481,7 +1232,7 @@ void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsig
             }
 
             case 'u': {
-                for(char c: self -> MINGZI){
+                for(char c: MINGZI){
                     int intchar = notturn ? (int)c : ((int)c) ^ 32;
                     if(self -> aidi[ver][notturn][intchar] > 0){
                         --self -> aidi[ver][notturn][intchar];
@@ -1492,8 +1243,8 @@ void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsig
                         state_pointer_oppo[254 - key] = c;
                         self -> zobrist_hash ^= self -> zobrist[(int)self -> state_red[zobrist_key]][zobrist_key];
                         short score_diff = self -> pst[(int)c][254 - key] - self -> aiaverage[ver-1][notturn][1][254 - key];
-                        _inner_recur(self, ver, uncertainty_dict, uncertainty_keys, result_dict, counter_dict, index+1, me, op*(self -> aidi[ver][notturn][intchar] + 1), pruning, score-score_diff/2, gamma, depths, \
-                            traverse_all_strategies, nullmove, nullmove_now, discount_factor);
+                        _inner_recur(self, ver, uncertainty_dict, uncertainty_keys, result_dict, counter_dict, index+1, me, op*(self -> aidi[ver][notturn][intchar] + 1), score-score_diff/2, alpha, beta, depths, \
+                            nullmove, argmaxsrc, argmaxdst);
                         state_pointer[key] = 'u';
                         state_pointer_oppo[254 - key] = 'U';
                         self -> zobrist_hash = zobrist_before;
@@ -1507,26 +1258,25 @@ void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsig
 }
 
 
-short eval4(board::AIBoard4* self, const int ver, const short gamma, std::vector<int>& depths, std::vector<bool>& traverse_all_strategies, const bool nullmove, const bool nullmove_now, const bool pruning, \
-    const float discount_factor){
+short eval4(board::AIBoard4* self, const int ver, const short alpha, const short beta, std::vector<int>& depths, const bool nullmove, unsigned char& argmaxsrc, unsigned char& argmaxdst){
     self -> original_turns[ver] = self -> turn;
     std::unordered_map<unsigned char, char> uncertainty_dict;
     std::vector<unsigned char> uncertainty_keys;
     std::unordered_map<std::pair<int, int>, short, myhash<int, int>> result_dict;
     std::unordered_map<std::pair<int, int>, short, myhash<int, int>> counter_dict;
     const char* state_pointer = self -> turn ? self -> state_red : self -> state_black;
-    bool need_clamp = false;
+    bool needclamp = false;
     std::unordered_map<unsigned char, char> empty_map;
     if(ver == 0){
-        return mtd_alphabeta_doublerecursive4(self, 0, gamma, depths, traverse_all_strategies, true, nullmove, nullmove_now, pruning, discount_factor, empty_map, &need_clamp);
+        return alphabeta_doublerecursive4(self, 0, alpha, beta, depths, ROOT, nullmove, nullmove, empty_map, &needclamp, argmaxsrc, argmaxdst);
     }
 
     else if((size_t)ver >= depths.size()){
-        int me = 0, op = 0;
-        return mtd_quiescence4(self, gamma, 0, true, &me, &op);
+        return self -> evaluate();
     }
 
     else{
+        short scoretmp = self -> score;
         memcpy(self -> aidi[ver], self -> aidi[ver-1], sizeof(self -> aidi[ver]));
         for(unsigned char i = 51; i <= 203; ++i){
             if((i & 15) < 3 || (i & 15) > 11) { continue; }
@@ -1535,22 +1285,22 @@ short eval4(board::AIBoard4* self, const int ver, const short gamma, std::vector
                 uncertainty_keys.push_back(i);
             }
         }
-        short nowscore = self -> score;
-        _inner_recur(self, ver, uncertainty_dict, uncertainty_keys, result_dict, counter_dict, 0, 1, 1, pruning, self -> score, gamma, depths, traverse_all_strategies, nullmove, nullmove_now, discount_factor);
-        self -> score = nowscore;
+        unsigned char x = 0, y = 0;
+        _inner_recur(self, ver, uncertainty_dict, uncertainty_keys, result_dict, counter_dict, 0, 1, 1, self -> score, alpha, beta, depths, nullmove, x, y);
         int nu = 0, de = 0; //numerator, denominator;
         for(auto it = result_dict.begin(); it != result_dict.end(); ++it){
             auto& item = it -> first;
             auto combinations = item.first * item.second;
-            nu += (it -> second) * combinations;
+            nu += (self -> turn == self -> original_turns[ver-1] ? 1 : -1) * (it -> second) * combinations;
             de += counter_dict[item] * combinations;
         }
+        self -> score = scoretmp;
         return self -> div(nu, de);
     }
     return 0;
 }
 
-short calleval4(board::AIBoard4* self, const short gamma, std::vector<int> depths, std::vector<bool> traverse_all_strategies, const bool nullmove, const bool pruning){
+short calleval4(board::AIBoard4* self, short alpha, short beta, std::vector<int> depths, const bool nullmove, unsigned char& argmaxsrc, unsigned char& argmaxdst){
     memset(self -> original_turns, self -> turn, sizeof(self -> original_turns));
-    return eval4(self, 0, gamma, depths, traverse_all_strategies, nullmove, nullmove, pruning, self -> discount_factor);
+    return eval4(self, 0, alpha, beta, depths, nullmove, argmaxsrc, argmaxdst);
 }

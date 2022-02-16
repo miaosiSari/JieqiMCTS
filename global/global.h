@@ -1,9 +1,8 @@
 #ifndef global_h
 #define global_h
 
-#define DEBUG 0
-#define BLACK 0
 #define VERSION_MAX 2
+#define MAX 257
 #include <map>
 #include <unordered_map>
 #include <set>
@@ -132,6 +131,27 @@ struct InfoDict{
    InfoDict()=delete;
    InfoDict(const bool islegal, const bool win, const char eat, const int eat_type, const char eat_check):islegal(islegal), win(win), eat(eat), eat_type(eat_type), eat_check(eat_check){}
    ~InfoDict()=default;
+};
+
+struct Exception{
+   std::string errorstr;
+   const char* what() const{
+      return errorstr.c_str();
+   }
+};
+
+
+struct tp{
+   uint64_t key;
+   bool turn;
+   int alphadepth;
+   int betadepth;
+   short alphaval;
+   short betaval;
+   short score;
+   unsigned char src;
+   unsigned char dst;
+   int recordplace;
 };
 
 #endif

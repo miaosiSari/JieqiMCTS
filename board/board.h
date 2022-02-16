@@ -5,7 +5,6 @@
 */
 #ifndef board_h
 #define board_h
-#define MAX 257
 #define CHESS_BOARD_SIZE 256
 #define MAX_POSSIBLE_MOVES 120
 #define A0 195 //(0, 0)坐标
@@ -36,15 +35,14 @@
 #include <stdio.h>
 #include <ctype.h>
 #include "../global/global.h"
+#define REDWIN 1
+#define DRAW 0
+#define BLACKWIN -1
 
 namespace py = pybind11;
 
 #define TXY(x, y) (unsigned char)translate_x_y(x, y)
-#ifdef WIN32
-#define SV(vector) std::random_shuffle(vector.begin(), vector.end());
-#else
 #define SV(vector) shuffle(vector.begin(), vector.end(), std::default_random_engine(std::chrono::system_clock::now().time_since_epoch().count()))
-#endif
 #define FIND(c, place, perspective) \
 if(c == '.'){ \
     eat_type_tmp = 0; \
@@ -93,13 +91,16 @@ public:
     char state_black[MAX];
     bool turn; //true红black黑
     int round; //回合, 从0开始
+    int state; 
     short** pst;
+    const std::unordered_set<int> redplaces, blackplaces;
+    std::unordered_map<unsigned char, char> LUT; 
     std::unordered_map<std::string, bool> hist;
     static const std::unordered_map<std::string, std::string> uni_pieces;
     Board()=delete;
     Board(short**pst, char** _dir) noexcept;
     ~Board();
-    void Reset(std::unordered_map<bool, std::unordered_map<unsigned char, char>>* random_map);
+    void Reset(bool turn, std::string* board);
     void initialize_di();
     const std::vector<std::string>& GetHistory() const;
     std::vector<std::string> GetStateString() const;
@@ -118,7 +119,7 @@ public:
     std::string GenRandomMove();
     void GenRandomMap();
     void PrintRandomMap();
-    void GenRandomBoard();
+    void GenRandomBoard(bool turn);
     std::function<int(int)> translate_x = [](const int x) -> int {return 12 - x;};
     std::function<int(int)> translate_y = [](const int y) -> int {return 3 + y;};
     std::function<int(int, int)> translate_x_y = [](const int x, const int y) -> int{return 195 - 16 * x + y;};

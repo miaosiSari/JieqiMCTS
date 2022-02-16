@@ -17,34 +17,28 @@
 #include "../global/global.h"
 
 namespace py = pybind11;
-#define INVALID -1
-#define NORMAL 0
-#define BLACK_WIN 1
-#define RED_WIN 2
-#define WASTE 3
-#define DRAW 4
 #define MAX_ROUNDS 200
-#define NEWRED new board::AIBoard4(board_pointer -> state_red, board_pointer -> turn, board_pointer -> round, board_pointer -> di_red, 0, &tp_move_bean, &tp_score_bean, &board_pointer -> hist, pst, L1, _dir)
-#define NEWBLACK new board::AIBoard4(board_pointer -> state_black, board_pointer -> turn, board_pointer -> round, board_pointer -> di_black, 0, &tp_move_bean, &tp_score_bean, &board_pointer -> hist, pst, L1, _dir)
+#define NEWRED new board::AIBoard4(board_pointer -> state_red, board_pointer -> turn, board_pointer -> round, board_pointer -> di_red, tptable, pst, L1, _dir)
+#define NEWBLACK new board::AIBoard4(board_pointer -> state_black, board_pointer -> turn, board_pointer -> round, board_pointer -> di_black, tptable, pst, L1, _dir)
 #define InfoDict2pydict(X, Y) \
 X["islegal"] = Y -> islegal; \
 X["win"] = Y -> win; \
 X["eat"] = Y -> eat; \
 X["eat_type"] = Y -> eat_type; \
 X["eat_check"] = Y -> eat_check; 
-#define DIDICT(X, Y) \
-X["R"] = Y[(int)'R']; \
-X["N"] = Y[(int)'N']; \
-X["B"] = Y[(int)'B']; \
-X["A"] = Y[(int)'A']; \
-X["C"] = Y[(int)'C']; \
-X["P"] = Y[(int)'P']; \
-X["r"] = Y[(int)'r']; \
-X["n"] = Y[(int)'n']; \
-X["b"] = Y[(int)'b']; \
-X["a"] = Y[(int)'a']; \
-X["c"] = Y[(int)'c']; \
-X["p"] = Y[(int)'p']; \
+#define DILIST(X, Y) \
+X.append(Y[1][(int)'R']); \
+X.append(Y[1][(int)'N']); \
+X.append(Y[1][(int)'B']); \
+X.append(Y[1][(int)'A']); \
+X.append(Y[1][(int)'C']); \
+X.append(Y[1][(int)'P']); \
+X.append(Y[0][(int)'r']); \
+X.append(Y[0][(int)'n']); \
+X.append(Y[0][(int)'b']); \
+X.append(Y[0][(int)'a']); \
+X.append(Y[0][(int)'c']); \
+X.append(Y[0][(int)'p']); \
 
 
 struct God{
@@ -56,15 +50,17 @@ struct God{
     std::unordered_set<std::string> hist_cache;
     board::Board* board_pointer;
     std::unique_ptr<board::Thinker> ai;
+    tp* tptable;
     short** pst;
     unsigned char** L1;
     char** _dir;
     God();
     ~God();
-    void Initialize(bool random);
+    bool Initialize(bool random, bool turn, std::string board);
     bool PrintPos();
     bool GetTurn();
     py::dict GetMeta();
+    py::tuple GetState();
     inline std::shared_ptr<InfoDict> InnerMove(std::string s);
     inline std::shared_ptr<InfoDict> InnerMove(const int encode_from, const int encode_to);
     py::dict _Move(std::shared_ptr<InfoDict> p);
@@ -72,7 +68,8 @@ struct God{
     py::dict Move(const int encode_from, const int encode_to);
     void UndoMove(int k);
     py::list GenMoves();
-    py::tuple AIHint();
+    py::tuple AIHint(int depth);
+    std::string Hint(int depth);
     std::string translate_single(int i){
         int x1 = 12 - (i >> 4);
         int y1 = (i & 15) - 3;
@@ -865,6 +862,9 @@ private:
         }
         delete[] _dir;
     }
+
+    std::string __Adapter(std::string& board);
+    bool __InnerHint(int depth, unsigned char& src, unsigned char& dst, py::dict* valdict);
 };
 
 #endif
