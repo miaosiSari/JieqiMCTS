@@ -18,6 +18,8 @@
 
 namespace py = pybind11;
 #define MAX_ROUNDS 200
+#define NEWREDDI new board::AIBoard4(board_pointer -> state_red, board_pointer -> turn, board_pointer -> round, ditmp, tptable, pst, L1, _dir)
+#define NEWBLACKDI new board::AIBoard4(board_pointer -> state_black, board_pointer -> turn, board_pointer -> round, ditmp, tptable, pst, L1, _dir)
 #define NEWRED new board::AIBoard4(board_pointer -> state_red, board_pointer -> turn, board_pointer -> round, board_pointer -> di_red, tptable, pst, L1, _dir)
 #define NEWBLACK new board::AIBoard4(board_pointer -> state_black, board_pointer -> turn, board_pointer -> round, board_pointer -> di_black, tptable, pst, L1, _dir)
 #define InfoDict2pydict(X, Y) \
@@ -61,15 +63,16 @@ struct God{
     bool GetTurn();
     py::dict GetMeta();
     py::tuple GetState();
-    inline std::shared_ptr<InfoDict> InnerMove(std::string s);
-    inline std::shared_ptr<InfoDict> InnerMove(const int encode_from, const int encode_to);
+    inline std::shared_ptr<InfoDict> InnerMove(const std::string s, const bool check);
+    inline std::shared_ptr<InfoDict> InnerMove(const int encode_from, const int encode_to, const bool check);
     py::dict _Move(std::shared_ptr<InfoDict> p);
-    py::dict Move(std::string s);
-    py::dict Move(const int encode_from, const int encode_to);
+    py::dict Move(const std::string s, bool check);
+    py::dict Move(const int encode_from, const int encode_to, bool check);
     void UndoMove(int k);
     py::list GenMoves();
-    py::tuple AIHint(int depth);
-    std::string Hint(int depth);
+    py::tuple AIHint(int depth, py::list di);
+    std::string Hint(int depth, py::list di);
+    short Rough(float discount_factor);
     std::string translate_single(int i){
         int x1 = 12 - (i >> 4);
         int y1 = (i & 15) - 3;
@@ -864,7 +867,7 @@ private:
     }
 
     std::string __Adapter(std::string& board);
-    bool __InnerHint(int depth, unsigned char& src, unsigned char& dst, py::dict* valdict);
+    bool __InnerHint(int depth, unsigned char& src, unsigned char& dst, py::dict* valdict, py::list& di);
 };
 
 #endif

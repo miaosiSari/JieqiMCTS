@@ -78,12 +78,12 @@ py::dict God::GetMeta(){
         "di1"_a = di1, "di0"_a = di0, "state"_a = GetState());
 }
 
-inline std::shared_ptr<InfoDict> God::InnerMove(std::string s){
-    return check_legal(s) ? board_pointer -> Move(s) : nullptr;
+inline std::shared_ptr<InfoDict> God::InnerMove(const std::string s, bool check){
+    return check_legal(s) ? board_pointer -> Move(s, check) : nullptr;
 }
 
-inline std::shared_ptr<InfoDict> God::InnerMove(const int encode_from, const int encode_to){
-    return board_pointer -> Move(encode_from, encode_to);
+inline std::shared_ptr<InfoDict> God::InnerMove(const int encode_from, const int encode_to, bool check){
+    return board_pointer -> Move(encode_from, encode_to, check);
 }
 
 py::dict God::_Move(std::shared_ptr<InfoDict> p){
@@ -105,12 +105,18 @@ py::dict God::_Move(std::shared_ptr<InfoDict> p){
     return returndict;
 }
 
-py::dict God::Move(std::string s){
-    return _Move(InnerMove(s));
+py::dict God::Move(const std::string s, bool check){
+    if(check){
+        board_pointer -> GenMoves(true);
+    }
+    return _Move(InnerMove(s, check));
 }
 
-py::dict God::Move(const int encode_from, const int encode_to){
-    return _Move(InnerMove(encode_from, encode_to));
+py::dict God::Move(const int encode_from, const int encode_to, bool check){
+    if(check){
+        board_pointer -> GenMoves(true);
+    }
+    return _Move(InnerMove(encode_from, encode_to, check));
 }
 
 void God::UndoMove(int k){
@@ -124,22 +130,58 @@ py::list God::GenMoves(){
     return tmp;
 }
 
-bool God::__InnerHint(int depth, unsigned char& src, unsigned char& dst, py::dict* valdict){
-    ai.reset(board_pointer->turn ? NEWRED : NEWBLACK);
+bool God::__InnerHint(int depth, unsigned char& src, unsigned char& dst, py::dict* valdict, py::list& di){
+    unsigned char ditmp[2][123];
+    bool divalid = true;
+    size_t counter = 0;
+    for(py::handle obj: di){
+        unsigned char tmp = obj.cast<unsigned char>();
+        switch(counter){
+            case 0: ditmp[1][(int)'R'] = tmp; break;
+            case 1: ditmp[1][(int)'N'] = tmp; break;
+            case 2: ditmp[1][(int)'B'] = tmp; break;
+            case 3: ditmp[1][(int)'A'] = tmp; break;
+            case 4: ditmp[1][(int)'C'] = tmp; break;
+            case 5: ditmp[1][(int)'P'] = tmp; break;
+            case 6: ditmp[0][(int)'r'] = tmp; break;
+            case 7: ditmp[0][(int)'n'] = tmp; break;
+            case 8: ditmp[0][(int)'b'] = tmp; break;
+            case 9: ditmp[0][(int)'a'] = tmp; break;
+            case 10: ditmp[0][(int)'c'] = tmp; break;
+            case 11: ditmp[0][(int)'p'] = tmp; break;
+            default: break;
+        }
+        ++counter;
+        if(counter > 12){
+            break;
+        }
+    }
+    if(counter != 12){
+        divalid = false;
+    }
+    if(divalid){
+        ai.reset(board_pointer->turn ? NEWREDDI : NEWBLACKDI);
+    }else{
+        ai.reset(board_pointer->turn ? NEWRED : NEWBLACK);
+    }
     return ai -> Think(depth, src, dst, valdict);
 }
 
-py::tuple God::AIHint(int depth){
+py::tuple God::AIHint(int depth, py::list di){
     unsigned char src = 0, dst = 0;
     py::dict valdict;
-    bool thinkres = __InnerHint(depth, src, dst, &valdict);
+    bool thinkres = __InnerHint(depth, src, dst, &valdict, di);
     return py::make_tuple(py::int_(src), py::int_(dst), py::bool_(thinkres), valdict);
 }
 
-std::string God::Hint(int depth){
+std::string God::Hint(int depth, py::list di){
     unsigned char src = 0, dst = 0;
-    __InnerHint(depth, src, dst, NULL);
+    __InnerHint(depth, src, dst, NULL, di);
     return translate_ucci(src, dst);
+}
+
+short God::Rough(float discount_factor){
+    return board_pointer -> Rough(discount_factor);
 }
 
 

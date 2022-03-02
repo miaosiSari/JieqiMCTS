@@ -614,3 +614,54 @@ void board::Board::GenRandomBoard(bool turn){
     }
     initialize_di();
 } 
+
+short board::Board::Rough(float discount_factor){
+    short result = 0;
+    float che = 0;
+    float che_opponent = 0;
+    const char* p = turn ? state_red : state_black;
+    for(unsigned char i = 51; i <= 203; ++i){
+        if((i & 15) < 3 || (i & 15) > 11){
+            continue;
+        }
+        if(p[i] >= 'D' && p[i] <= 'I'){
+            int real_chess = (int)random_map[turn][i];
+            if(real_chess == 'R'){
+                che += 0.5f;
+            }
+            result += (short)(pst[real_chess][i]/discount_factor);
+        }
+        else if(::isupper(p[i])){
+            if(p[i] == 'R'){
+                che += 1.0f;
+            }
+            result += pst[(int)p[i]][i];
+        }
+        else if(p[i] >= 'd' && p[i] <= 'i'){
+            int real_chess = (int)random_map[turn][i];
+            if(real_chess == 'r'){
+                che_opponent += 0.5f;
+            }
+            result -= (short)(pst[(int)swapcase(real_chess)][254-i]/discount_factor);
+        }
+        else if(::islower(p[i])){
+            if(p[i] == 'r'){
+                che_opponent += 1.0f;
+            }
+            result -= pst[(int)swapcase(p[i])][254-i];
+        }
+    }
+    if(p[195] != 'D'){
+        result -= (short)(30 * che_opponent);
+    }
+    if(p[203] != 'D'){
+        result -= (short)(30 * che_opponent);
+    }
+    if(p[51] != 'd'){
+        result += (short)(30 * che);
+    }
+    if(p[59] != 'd'){
+        result += (short)(30 * che);
+    }
+    return result;
+}

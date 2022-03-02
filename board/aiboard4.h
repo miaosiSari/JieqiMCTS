@@ -123,20 +123,20 @@ ucci2val[ucci] = val;
 unsigned char t1 = 0, t2 = 0; \
 if(type == CUT){\
     depths[ver] -= 1; \
-    val = -alphabeta_doublerecursive4(self, ver, -alpha-1, -alpha, depths, CUT, nullmove, true, uncertainty_dict, needclamp, t1, t2);\
+    val = -alphabeta_doublerecursive4(self, ver, -alpha-1, -alpha, depths, CUT, uncertainty_dict, needclamp, t1, t2);\
     depths[ver] += 1; \
 }else{\
     if(best == -MATE_UPPER){\
         depths[ver] -= 1; \
-        val = -alphabeta_doublerecursive4(self, ver, -beta, -alpha, depths, PV, nullmove, false, uncertainty_dict, needclamp, t1, t2); \
+        val = -alphabeta_doublerecursive4(self, ver, -beta, -alpha, depths, PV, uncertainty_dict, needclamp, t1, t2); \
         depths[ver] += 1; \
     }else{ \
         depths[ver] -= 1; \
-        val = -alphabeta_doublerecursive4(self, ver, -alpha-1, -alpha, depths, CUT, nullmove, true, uncertainty_dict, needclamp, t1, t2); \
+        val = -alphabeta_doublerecursive4(self, ver, -alpha-1, -alpha, depths, CUT, uncertainty_dict, needclamp, t1, t2); \
         depths[ver] += 1; \
         if(val > alpha && val < beta) {\
             depths[ver] -= 1; \
-            val = -alphabeta_doublerecursive4(self, ver, -beta, -alpha, depths, PV, nullmove, false, uncertainty_dict, needclamp, t1, t2); \
+            val = -alphabeta_doublerecursive4(self, ver, -beta, -alpha, depths, PV, uncertainty_dict, needclamp, t1, t2); \
             depths[ver] += 1; \
         }\
     }\
@@ -204,7 +204,6 @@ namespace board{
 
 typedef short(*SCORE4)(board::AIBoard4* bp, const char* state_pointer, unsigned char src, unsigned char dst);
 typedef void(*KONGTOUPAO_SCORE4)(board::AIBoard4* bp, short* kongtoupao_score, short* kongtoupao_score_opponent);
-typedef std::string(*THINKER4)(board::AIBoard4* bp, int maxdepth);
 void register_score_functions4();
 std::string SearchScoreFunction4(void* score_func, int type);
 template <typename K, typename V>
@@ -511,66 +510,6 @@ public:
         }
         return -MATE_UPPER;
     }
-
-    void Trace(int depth_limit, std::vector<std::string> hints){
-        int j = 0, depth = depth_limit; //move times
-        std::vector<int> movetype;
-        Scan();
-        while(1){
-            bool oppomate = false;
-            ExecutedDebugger(&oppomate);
-            if((size_t)j < hints.size()){
-                std::cout << DebugPrintPos() << "ply == " << ply << ", j == " << j << ", hints.size()==" << hints.size() << ", hints[j]=="  << hints[j] << ", depth==" << depth << "\n\n";
-                Move(f(hints[j].substr(0, 2)), f(hints[j].substr(2, 2)), 0);
-                if(!oppomate) --depth;
-                movetype.push_back(1);
-                j++;
-                continue;
-            }
-            bool find = true;
-            std::string ucci;
-            debugtuple score;
-            if(moves.find({zobrist_hash, MIX(ply, depth)}) == moves.end()){
-                find = false;
-                printf("<%d %d> does not exist! hash=%zu, turn=%d, depth=%d\n", ply, depth, zobrist_hash, turn, depth);
-                tp* hashnode = NULL;
-                ProbeHash(depth, 0, 0, false, &hashnode);
-                if(hashnode){
-                    ucci = translate_ucci(hashnode -> src, hashnode -> dst);
-                    std::cout << "find in hashnode: " << ucci << " " << hashnode -> alphaval << " " << hashnode -> betaval << "\n";
-                }else{
-                    break;
-                }
-            }
-            if(find){
-                debugtuple score = moves[{zobrist_hash, MIX(ply, depth)}];
-                ucci = score.ucci;
-                std::cout << DebugPrintPos() << std::boolalpha << "<ply, depth> == <" << ply << ", " << depth << ">, hash == " << zobrist_hash << ", ucci == " << score.ucci << ", val == " << score.val << ", score == " << score.score << ", alpha==" << score.alpha << \
-                ", beta==" << score.beta << ", recordplace==" << score.recordplace << ", recordplacehash==" << score.recordplacehash  << ", nodetype==" << (score.nodetype == ROOT ? "ROOT" : score.nodetype == PV ? "PV" : "CUT") << "\n\n";
-            }else{
-                std::cout << std::boolalpha << "<ply, depth> == <" << ply << ", " << depth << ">" << DebugPrintPos() << " :not find, taken from hashtable\n\n";
-            }
-            bool retval = false;
-            if(!ucci.empty() && ucci != "^<^<") {
-                retval = Move(f(ucci.substr(0, 2)), f(ucci.substr(2, 2)), 0);
-                depth -= (oppomate ? 0 : 1);
-                movetype.push_back(1);
-            }
-            else{
-                retval = NULLMove();
-                depth -= 3;
-                movetype.push_back(0);
-            } 
-            assert(retval || oppomate);
-            if(score.recordplace == 3 || depth == 0){
-                break;
-            }
-        }
-        printf("FINISHED: depth=%d, %s, hints.size()==%zu\n", depth, DebugPrintPos().c_str(), hints.size());
-        for(int k = (int)(movetype.size()) - 1; k >= 0; --k){
-            UndoMove(movetype[k]);
-        }
-    }
    
 private:
     char** _dir;
@@ -580,7 +519,6 @@ private:
     static const std::unordered_map<std::string, std::string> _uni_pieces;
     SCORE4 _score_func = NULL;
     KONGTOUPAO_SCORE4 _kongtoupao_score_func = NULL;
-    THINKER4 _thinker_func = NULL;
     std::function<std::string(const char)> _getstring = [](const char c) -> std::string {
         std::string ret;
         const std::string c_string(1, c);
@@ -615,12 +553,11 @@ std::string thinker4(board::AIBoard4* bp, int maxdepth);
 void complicated_kongtoupao_score_function4(board::AIBoard4* bp, short* kongtoupao_score, short* kongtoupao_score_opponent);
 short complicated_score_function4(board::AIBoard4* self, const char* state_pointer, unsigned char src, unsigned char dst);
 short alphabeta4(board::AIBoard4* self, const short alpha, const short beta, int depth, int type, const bool nullmove, const bool nullmovenow, unsigned char& src, unsigned char& dst, py::dict* valdict);
-short alphabeta_doublerecursive4(board::AIBoard4* self, const int ver, short alpha, short beta, std::vector<int>& depths, const int type, const bool nullmove, const bool nullmovenow, std::unordered_map<unsigned char, char>& uncertainty_dict, bool* needclamp, unsigned char& argmaxsrc, unsigned char& argmaxdst);
+short alphabeta_doublerecursive4(board::AIBoard4* self, const int ver, short alpha, short beta, std::vector<int>& depths, const int type, std::unordered_map<unsigned char, char>& uncertainty_dict, bool* needclamp, unsigned char& argmaxsrc, unsigned char& argmaxdst);
 void _inner_recur(board::AIBoard4* self, const int ver, std::unordered_map<unsigned char, char>& uncertainty_dict, std::vector<unsigned char>& uncertainty_keys, \
     std::unordered_map<std::pair<int, int>, short, myhash<int, int>>& result_dict, std::unordered_map<std::pair<int, int>, short, myhash<int, int>>& counter_dict, \
     const int index, const int me, const int op, const short score, const short alpha, const short beta, \
-    std::vector<int>& depths, const bool nullmove, unsigned char& argmaxsrc, unsigned char& argmaxdst);
-short eval4(board::AIBoard4* self, const int ver, const short alpha, const short beta, std::vector<int>& depths, const bool nullmove, unsigned char& argmaxsrc, unsigned char& argmaxdst);
-short calleval4(board::AIBoard4* self, short alpha, short beta, std::vector<int> depths, const bool nullmove, unsigned char& argmaxsrc, unsigned char& argmaxdst);
-void debugset(board::AIBoard4* self);
+    std::vector<int>& depths, unsigned char& argmaxsrc, unsigned char& argmaxdst);
+short eval4(board::AIBoard4* self, const int ver, const short alpha, const short beta, std::vector<int>& depthse, unsigned char& argmaxsrc, unsigned char& argmaxdst);
+short calleval4(board::AIBoard4* self, short alpha, short beta, std::vector<int> depths, unsigned char& argmaxsrc, unsigned char& argmaxdst);
 #endif
