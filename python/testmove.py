@@ -14,3 +14,6 @@ print(g.Move("a0c2", True))
 move = random.sample(g.GenMoves(), 1)[0]
 print(UCCI(*move))
 print(s.move(*move, True))
+g = God()
+g.Initialize(random=False)
+print(g.GetMeta())
