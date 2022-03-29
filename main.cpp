@@ -13,7 +13,8 @@ PYBIND11_MODULE(cppjieqi, m) {
     py::class_<God>(m, "God")
         .def(py::init<>())
         .def("Initialize", &God::Initialize, py::arg("random") = true, py::arg("turn") = true, py::arg("board") = "")
-        .def("PrintPos", &God::PrintPos)
+        .def("PrintPos", py::overload_cast<>(&God::PrintPos))
+        .def("PrintPos", py::overload_cast<bool, bool, bool, bool>(&God::PrintPos))
         .def("GetTurn", &God::GetTurn)
         .def("GetState", &God::GetState)
         .def("GetMeta", &God::GetMeta)
@@ -62,6 +63,7 @@ PYBIND11_MODULE(cppjieqi, m) {
         .def("state", &Searcher::getstate)
         .def("print", &Searcher::PrintPos)
         .def("rough", &Searcher::Rough, py::arg("discount_factor") = 1.5)
+        .def("walkpa", &Searcher::walkpa)
         .def_readonly("god", &Searcher::g)
         .def_readwrite("c_puct", &Searcher::c_puct);
     m.def("UCCI", [](const int src, const int dst) -> std::string{

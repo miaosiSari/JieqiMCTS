@@ -165,7 +165,6 @@ public:
     std::unordered_map<bool, std::unordered_map<unsigned char, char>> random_map;
     static void Translate(unsigned char i, unsigned char j, char ucci[5]);
     static void TranslateSingle(unsigned char i, char ucci[3]);
-    static void Print_ij_ucci(unsigned char i, unsigned char j);
    
 private:
     char** _dir;

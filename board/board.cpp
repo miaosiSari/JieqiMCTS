@@ -252,6 +252,7 @@ std::shared_ptr<InfoDict> board::Board::Move(const std::string ucci, const bool 
 
 std::shared_ptr<InfoDict> board::Board::Move(const int encode_from, const int encode_to, const bool check){
     if(finished){
+        std::cout << "return nullptr because of finished!\n";
         return nullptr;
     }
     historymoves.push_back(new history(state_red, state_black, di_red, di_black));
@@ -495,29 +496,23 @@ void board::Board::TranslateSingle(unsigned char i, char ucci[3]){
     ucci[2] = '\0';
 }
 
-void board::Board::Print_ij_ucci(unsigned char i, unsigned char j){
-    printf("i = %d, j = %d", i, j);
-    char ucci[5];
-    board::Board::Translate(i, j, ucci);
-    printf(" (ucci = %s).\n", ucci);
-}
 
 void board::Board::GenRandomMap(){
     std::multiset<char> chararray_red_set = {'R', 'R', 'N', 'N', 'B', 'B', 'A', 'A', 'C', 'C', 'P', 'P', 'P', 'P', 'P'};
     std::multiset<char> chararray_black_set = {'r', 'r', 'n', 'n', 'b', 'b', 'a', 'a', 'c', 'c', 'p', 'p', 'p', 'p', 'p'};
     for(int i = 51; i <= 203; ++i){
         if(::isupper(state_red[i]) && state_red[i] != 'K' && MINGZI.find(state_red[i]) != std::string::npos){
-            chararray_red_set.erase(state_red[i]);
+            auto it = chararray_red_set.lower_bound(state_red[i]);
+            if(it != chararray_red_set.end()) {chararray_red_set.erase(it);}
         }
         if(::islower(state_red[i]) && state_red[i] != 'k' && MINGZI.find(swapcase(state_red[i])) != std::string::npos){
-            chararray_black_set.erase(state_red[i]);
+            auto it = chararray_black_set.lower_bound(state_red[i]);
+            if(it != chararray_black_set.end()) {chararray_black_set.erase(it);}
         }
     }
     std::vector<char> chararray_red, chararray_black;
     chararray_red.assign(chararray_red_set.begin(), chararray_red_set.end());
     chararray_black.assign(chararray_black_set.begin(), chararray_black_set.end());
-
-
     std::vector<unsigned char> position_red = {TXY(0, 0), TXY(0, 1), TXY(0, 2), TXY(0, 3), TXY(0, 5), TXY(0, 6), \
         TXY(0, 7), TXY(0, 8), TXY(2, 1), TXY(2, 7), TXY(3, 0), TXY(3, 2), TXY(3, 4), TXY(3, 6), TXY(3, 8)};
     std::vector<unsigned char> position_black = {TXY(9, 0), TXY(9, 1), TXY(9, 2), TXY(9, 3), TXY(9, 5), TXY(9, 6), \

@@ -895,7 +895,7 @@ inline short complicated_score_function4(board::AIBoard4* self, const char* stat
 
             if((src == 164 && dst == 52 && state_pointer[52] == 'e' && (state_pointer[51] == 'd' || state_pointer[51] == 'r')) || \
                     (src == 170 && dst == 58 && state_pointer[58] == 'e' && (state_pointer[59] == 'd' || state_pointer[59] == 'r'))){
-                        if((bp -> che) < (bp -> che_opponent) || bp -> che == 0) {score -= 150; }
+                        if((bp -> che) <= (bp -> che_opponent) || bp -> che == 0) {score -= 150; }
                     }
          
         }else if(p == 'I' && state_pointer[src - 32] != 'r' && state_pointer[src - 32] != 'p'){

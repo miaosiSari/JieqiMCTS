@@ -429,7 +429,8 @@ public:
     }
 
     std::function<short()> evaluate = [this]() -> short{
-        return score;
+        Scan();
+        return score + kongtoupao_score - kongtoupao_score_opponent;
     };
 
     void RecordHash(int depth, int val, int score, int hashf, unsigned char src, unsigned char dst, int recordplace){

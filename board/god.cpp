@@ -48,8 +48,13 @@ bool God::Initialize(bool random, bool turn, std::string board){
     return need;
 }
 
+bool God::PrintPos(bool turn, bool iscovered, bool god, bool swapcasewhenblack){
+    board_pointer -> PrintPos(turn, iscovered, god, swapcasewhenblack);
+    return board_pointer -> turn;
+}
+
 bool God::PrintPos(){
-    board_pointer -> PrintPos(board_pointer->turn, true, false, true);
+    board_pointer -> PrintPos();
     return board_pointer -> turn;
 }
 
@@ -79,6 +84,7 @@ py::dict God::GetMeta(){
 }
 
 inline std::shared_ptr<InfoDict> God::InnerMove(const std::string s, bool check){
+    if(!check_legal(s)){printf("return nullptr because of !check_legal(%s)\n", s.c_str());}
     return check_legal(s) ? board_pointer -> Move(s, check) : nullptr;
 }
 

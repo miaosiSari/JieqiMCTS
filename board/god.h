@@ -59,6 +59,7 @@ struct God{
     God();
     ~God();
     bool Initialize(bool random, bool turn, std::string board);
+    bool PrintPos(bool turn, bool iscovered, bool god, bool swapcasewhenblack);
     bool PrintPos();
     bool GetTurn();
     py::dict GetMeta();

@@ -467,6 +467,18 @@ struct Searcher{
         return g.Rough(discount_factor);
     }
 
+    size_t walkpa(size_t steps){
+        curtmp = cur;
+        for(size_t step = 0; step < steps; ++step){
+            if(cur -> parent){
+                cur = cur -> parent;
+            }else{
+                return step;
+            }
+        }
+        return steps;
+    }
+
 private:
     size_t node_count;
     Node* curtmp;
