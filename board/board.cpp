@@ -252,7 +252,6 @@ std::shared_ptr<InfoDict> board::Board::Move(const std::string ucci, const bool 
 
 std::shared_ptr<InfoDict> board::Board::Move(const int encode_from, const int encode_to, const bool check){
     if(finished){
-        std::cout << "return nullptr because of finished!\n";
         return nullptr;
     }
     historymoves.push_back(new history(state_red, state_black, di_red, di_black));

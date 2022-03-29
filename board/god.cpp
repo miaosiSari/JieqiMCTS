@@ -84,7 +84,6 @@ py::dict God::GetMeta(){
 }
 
 inline std::shared_ptr<InfoDict> God::InnerMove(const std::string s, bool check){
-    if(!check_legal(s)){printf("return nullptr because of !check_legal(%s)\n", s.c_str());}
     return check_legal(s) ? board_pointer -> Move(s, check) : nullptr;
 }
 
